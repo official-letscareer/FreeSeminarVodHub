@@ -3,8 +3,6 @@
 import { AuthSession } from './types';
 import { SESSION_KEY, ADMIN_SESSION_KEY } from './constants';
 
-export const MOCK_MODE = process.env.NEXT_PUBLIC_MOCK_MODE === 'true';
-
 export async function verifyChallenge(
   name: string,
   phoneNum: string

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import { isAllowedUser, checkRateLimit } from '@/lib/kv';
+import { RATE_LIMIT } from '@/lib/constants';
 
 function isValidName(name: unknown): name is string {
   return typeof name === 'string' && name.trim().length > 0;
@@ -8,6 +8,14 @@ function isValidName(name: unknown): name is string {
 
 function isValidPhone(phone: unknown): phone is string {
   return typeof phone === 'string' && /^010\d{8}$/.test(phone);
+}
+
+function getClientIp(request: NextRequest): string {
+  return (
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    'unknown'
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -30,27 +38,57 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const mockMode = process.env.MOCK_MODE === 'true';
-  const apiUrl = process.env.LETSCAREER_API_URL;
+  // Rate Limiting (IP + 전화번호 기준)
+  const ip = getClientIp(request);
+  const rateLimitKey = `verify:${ip}:${phoneNum}`;
+  try {
+    const { allowed, remaining } = await checkRateLimit(
+      rateLimitKey,
+      RATE_LIMIT.MAX_REQUESTS,
+      RATE_LIMIT.WINDOW_SECONDS
+    );
+    if (!allowed) {
+      return NextResponse.json(
+        { message: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' },
+        {
+          status: 429,
+          headers: { 'Retry-After': String(RATE_LIMIT.WINDOW_SECONDS), 'X-RateLimit-Remaining': String(remaining) },
+        }
+      );
+    }
+  } catch {
+    // Rate Limiting 실패 시 요청은 통과시킴
+  }
 
+  const trimmedName = name.trim();
   let isChallenge = false;
 
-  if (mockMode) {
-    const usersRaw = readFileSync(join(process.cwd(), 'mock-data', 'users.json'), 'utf-8');
-    const users: { name: string; phoneNum: string }[] = JSON.parse(usersRaw);
-    isChallenge = users.some((u) => u.name === name.trim() && u.phoneNum === phoneNum);
+  // 1) 예외 유저 테이블 확인
+  const allowed = await isAllowedUser(trimmedName, phoneNum);
+  if (allowed) {
+    isChallenge = true;
   } else {
+    // 2) 렛츠커리어 서버 v2 API 호출
+    const apiUrl = process.env.LETSCAREER_API_URL;
     if (!apiUrl) {
       return NextResponse.json({ message: '서버 설정 오류입니다.' }, { status: 500 });
     }
     try {
-      const res = await fetch(`${apiUrl}/api/v1/user/verify-challenge`, {
+      const res = await fetch(`${apiUrl}/api/v2/user/verify-challenge`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), phoneNum }),
+        body: JSON.stringify({ name: trimmedName, phoneNum }),
       });
-      const data = await res.json();
-      isChallenge = data?.data?.isChallenge === true;
+
+      if (res.status === 404) {
+        // 가입되지 않은 사용자
+        isChallenge = false;
+      } else if (res.ok) {
+        const data = await res.json();
+        isChallenge = data?.data?.isChallenge === true;
+      } else {
+        return NextResponse.json({ message: '서버 연결에 실패했습니다.' }, { status: 502 });
+      }
     } catch {
       return NextResponse.json({ message: '서버 연결에 실패했습니다.' }, { status: 502 });
     }

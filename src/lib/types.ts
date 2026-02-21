@@ -3,6 +3,14 @@ export interface VodItem {
   title: string;
   youtubeId: string;
   order: number;
+  embedEnabled: boolean;
+  createdAt: string;
+}
+
+export interface AllowedUser {
+  id: number;
+  name: string;
+  phoneNum: string;
   createdAt: string;
 }
 

@@ -1,100 +1,184 @@
-import { readFileSync } from 'fs';
-import { join } from 'path';
-import { VodItem } from './types';
-import { KV_KEYS } from './constants';
+import { supabase } from './supabase';
+import { VodItem, AllowedUser } from './types';
 
-// ─── 인메모리 목 스토어 (MOCK_MODE=true 전용) ───────────────────────────────
-const mockStore = new Map<string, unknown>();
-
-function initMockStore() {
-  if (mockStore.has(KV_KEYS.VOD_LIST)) return;
-  try {
-    const raw = readFileSync(join(process.cwd(), 'mock-data', 'vods.json'), 'utf-8');
-    const vods: VodItem[] = JSON.parse(raw);
-    mockStore.set(KV_KEYS.VOD_LIST, vods);
-    if (vods.length > 0) {
-      mockStore.set(KV_KEYS.VOD_COUNTER, Math.max(...vods.map((v) => v.id)));
-    }
-  } catch {
-    mockStore.set(KV_KEYS.VOD_LIST, []);
-  }
+// ─── Supabase row → VodItem 변환 ─────────────────────────────────────────────
+function toVodItem(row: Record<string, unknown>): VodItem {
+  return {
+    id: row.id as number,
+    title: row.title as string,
+    youtubeId: row.youtube_id as string,
+    order: row.order as number,
+    embedEnabled: row.embed_enabled as boolean,
+    createdAt: row.created_at as string,
+  };
 }
 
-const mockKv = {
-  async get<T>(key: string): Promise<T | null> {
-    return (mockStore.get(key) as T) ?? null;
-  },
-  async set(key: string, value: unknown): Promise<void> {
-    mockStore.set(key, JSON.parse(JSON.stringify(value)));
-  },
-  async incr(key: string): Promise<number> {
-    const current = (mockStore.get(key) as number) ?? 0;
-    const next = current + 1;
-    mockStore.set(key, next);
-    return next;
-  },
-};
-
-// ─── KV 인스턴스 선택 ─────────────────────────────────────────────────────────
-function getKv() {
-  if (process.env.MOCK_MODE === 'true') {
-    initMockStore();
-    return mockKv;
-  }
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { kv } = require('@vercel/kv');
-  return kv;
+function toAllowedUser(row: Record<string, unknown>): AllowedUser {
+  return {
+    id: row.id as number,
+    name: row.name as string,
+    phoneNum: row.phone_num as string,
+    createdAt: row.created_at as string,
+  };
 }
 
-// ─── 공개 API ─────────────────────────────────────────────────────────────────
+// ─── VOD CRUD ─────────────────────────────────────────────────────────────────
 export async function getVodList(): Promise<VodItem[]> {
-  const store = getKv();
-  const list = (await store.get(KV_KEYS.VOD_LIST)) as VodItem[] | null;
-  if (!list) return [];
-  return list.sort((a: VodItem, b: VodItem) => a.order - b.order);
+  const { data, error } = await supabase
+    .from('vods')
+    .select('*')
+    .order('order', { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []).map(toVodItem);
 }
 
-export async function getNextId(): Promise<number> {
-  const store = getKv();
-  return store.incr(KV_KEYS.VOD_COUNTER);
+export async function getEnabledVodList(): Promise<VodItem[]> {
+  const { data, error } = await supabase
+    .from('vods')
+    .select('*')
+    .eq('embed_enabled', true)
+    .order('order', { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []).map(toVodItem);
 }
 
 export async function addVod(
   data: Pick<VodItem, 'title' | 'youtubeId'>
 ): Promise<VodItem> {
-  const list = await getVodList();
-  const id = await getNextId();
-  const newVod: VodItem = {
-    id,
-    title: data.title,
-    youtubeId: data.youtubeId,
-    order: list.length + 1,
-    createdAt: new Date().toISOString(),
-  };
-  const store = getKv();
-  await store.set(KV_KEYS.VOD_LIST, [...list, newVod]);
-  return newVod;
+  const { data: maxRow } = await supabase
+    .from('vods')
+    .select('order')
+    .order('order', { ascending: false })
+    .limit(1)
+    .single();
+
+  const nextOrder = maxRow ? (maxRow.order as number) + 1 : 1;
+
+  const { data: inserted, error } = await supabase
+    .from('vods')
+    .insert({
+      title: data.title,
+      youtube_id: data.youtubeId,
+      order: nextOrder,
+      embed_enabled: true,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return toVodItem(inserted);
 }
 
 export async function deleteVod(id: number): Promise<void> {
+  const { error } = await supabase.from('vods').delete().eq('id', id);
+  if (error) throw error;
+
+  // order 재정렬
   const list = await getVodList();
-  const updated = list
-    .filter((v: VodItem) => v.id !== id)
-    .map((v: VodItem, i: number) => ({ ...v, order: i + 1 }));
-  const store = getKv();
-  await store.set(KV_KEYS.VOD_LIST, updated);
+  for (let i = 0; i < list.length; i++) {
+    await supabase
+      .from('vods')
+      .update({ order: i + 1 })
+      .eq('id', list[i].id);
+  }
 }
 
 export async function updateVodOrder(orderedIds: number[]): Promise<VodItem[]> {
-  const list = await getVodList();
-  const updated = orderedIds
-    .map((id, i) => {
-      const vod = list.find((v: VodItem) => v.id === id);
-      if (!vod) return null;
-      return { ...vod, order: i + 1 };
-    })
-    .filter((v): v is VodItem => v !== null);
-  const store = getKv();
-  await store.set(KV_KEYS.VOD_LIST, updated);
-  return updated;
+  for (let i = 0; i < orderedIds.length; i++) {
+    await supabase
+      .from('vods')
+      .update({ order: i + 1 })
+      .eq('id', orderedIds[i]);
+  }
+  return getVodList();
+}
+
+export async function toggleVodEmbed(id: number, enabled: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('vods')
+    .update({ embed_enabled: enabled })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+// ─── 예외 유저 CRUD ──────────────────────────────────────────────────────────
+export async function getAllowedUsers(): Promise<AllowedUser[]> {
+  const { data, error } = await supabase
+    .from('allowed_users')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []).map(toAllowedUser);
+}
+
+export async function addAllowedUser(
+  name: string,
+  phoneNum: string
+): Promise<AllowedUser> {
+  const { data, error } = await supabase
+    .from('allowed_users')
+    .insert({ name, phone_num: phoneNum })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return toAllowedUser(data);
+}
+
+export async function deleteAllowedUser(id: number): Promise<void> {
+  const { error } = await supabase.from('allowed_users').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function isAllowedUser(
+  name: string,
+  phoneNum: string
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('allowed_users')
+    .select('id')
+    .eq('name', name)
+    .eq('phone_num', phoneNum)
+    .limit(1);
+
+  if (error) throw error;
+  return (data?.length ?? 0) > 0;
+}
+
+// ─── Rate Limiting ───────────────────────────────────────────────────────────
+export async function checkRateLimit(
+  key: string,
+  maxRequests: number,
+  windowSeconds: number
+): Promise<{ allowed: boolean; remaining: number }> {
+  const windowStart = new Date(Date.now() - windowSeconds * 1000).toISOString();
+
+  // 윈도우 내 요청 수 조회
+  const { count, error } = await supabase
+    .from('rate_limits')
+    .select('*', { count: 'exact', head: true })
+    .eq('key', key)
+    .gte('created_at', windowStart);
+
+  if (error) throw error;
+
+  const currentCount = count ?? 0;
+  const allowed = currentCount < maxRequests;
+
+  if (allowed) {
+    // 요청 기록 삽입
+    await supabase.from('rate_limits').insert({ key });
+  }
+
+  // 만료된 레코드 정리 (비동기, 실패해도 무시)
+  supabase
+    .from('rate_limits')
+    .delete()
+    .lt('created_at', windowStart)
+    .then(() => {});
+
+  return { allowed, remaining: Math.max(0, maxRequests - currentCount - (allowed ? 1 : 0)) };
 }

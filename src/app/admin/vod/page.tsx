@@ -14,10 +14,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { VodItem } from '@/lib/types';
+import { VodItem, AllowedUser } from '@/lib/types';
 
 export default function AdminVodPage() {
   const router = useRouter();
+
+  // ─── VOD 상태 ─────────────────────────────────────────────────────
   const [vodList, setVodList] = useState<VodItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -27,6 +29,16 @@ export default function AdminVodPage() {
   const [addError, setAddError] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<VodItem | null>(null);
 
+  // ─── 예외 유저 상태 ───────────────────────────────────────────────
+  const [users, setUsers] = useState<AllowedUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [userName, setUserName] = useState('');
+  const [userPhone, setUserPhone] = useState('');
+  const [userAddLoading, setUserAddLoading] = useState(false);
+  const [userError, setUserError] = useState('');
+  const [deleteUserTarget, setDeleteUserTarget] = useState<AllowedUser | null>(null);
+
+  // ─── VOD 데이터 로드 ──────────────────────────────────────────────
   const fetchVodList = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/vod');
@@ -43,10 +55,26 @@ export default function AdminVodPage() {
     }
   }, [router]);
 
+  // ─── 예외 유저 데이터 로드 ────────────────────────────────────────
+  const fetchUsers = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/users');
+      if (res.status === 401) return;
+      const data = await res.json();
+      setUsers(data);
+    } catch {
+      // 유저 로드 실패 시 조용히 무시
+    } finally {
+      setUsersLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchVodList();
-  }, [fetchVodList]);
+    fetchUsers();
+  }, [fetchVodList, fetchUsers]);
 
+  // ─── VOD 핸들러 ───────────────────────────────────────────────────
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     setAddError('');
@@ -82,6 +110,19 @@ export default function AdminVodPage() {
     }
   }
 
+  async function handleToggleEmbed(id: number, currentEnabled: boolean) {
+    try {
+      await fetch('/api/admin/vod', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, embedEnabled: !currentEnabled }),
+      });
+      await fetchVodList();
+    } catch {
+      setError('상태 변경에 실패했습니다.');
+    }
+  }
+
   async function handleMoveUp(index: number) {
     if (index === 0) return;
     const newList = [...vodList];
@@ -108,6 +149,42 @@ export default function AdminVodPage() {
     await fetchVodList();
   }
 
+  // ─── 예외 유저 핸들러 ─────────────────────────────────────────────
+  async function handleAddUser(e: React.FormEvent) {
+    e.preventDefault();
+    setUserError('');
+    setUserAddLoading(true);
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: userName, phoneNum: userPhone }),
+      });
+      if (res.ok) {
+        setUserName('');
+        setUserPhone('');
+        await fetchUsers();
+      } else {
+        const data = await res.json();
+        setUserError(data.message || '유저 추가에 실패했습니다.');
+      }
+    } catch {
+      setUserError('서버 연결에 실패했습니다.');
+    } finally {
+      setUserAddLoading(false);
+    }
+  }
+
+  async function handleDeleteUser(id: number) {
+    try {
+      await fetch(`/api/admin/users?id=${id}`, { method: 'DELETE' });
+      setDeleteUserTarget(null);
+      await fetchUsers();
+    } catch {
+      setUserError('삭제에 실패했습니다.');
+    }
+  }
+
   async function handleLogout() {
     await fetch('/api/admin/auth', { method: 'DELETE' });
     router.push('/admin');
@@ -127,7 +204,7 @@ export default function AdminVodPage() {
           </Alert>
         )}
 
-        {/* VOD 추가 폼 */}
+        {/* ── VOD 추가 폼 ──────────────────────────────────────────── */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">VOD 추가</CardTitle>
@@ -160,7 +237,7 @@ export default function AdminVodPage() {
           </CardContent>
         </Card>
 
-        {/* VOD 목록 */}
+        {/* ── VOD 목록 ─────────────────────────────────────────────── */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">VOD 목록 ({vodList.length}개)</CardTitle>
@@ -173,9 +250,14 @@ export default function AdminVodPage() {
             ) : (
               <ul className="space-y-2">
                 {vodList.map((vod, index) => (
-                  <li key={vod.id} className="flex items-center gap-2 p-3 bg-white rounded border">
+                  <li key={vod.id} className={`flex items-center gap-2 p-3 rounded border ${vod.embedEnabled ? 'bg-white' : 'bg-gray-100 opacity-60'}`}>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{vod.title}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm truncate">{vod.title}</p>
+                        {!vod.embedEnabled && (
+                          <span className="text-xs bg-gray-300 text-gray-700 px-1.5 py-0.5 rounded shrink-0">비공개</span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2 mt-1">
                         <img
                           src={`https://img.youtube.com/vi/${vod.youtubeId}/default.jpg`}
@@ -185,7 +267,14 @@ export default function AdminVodPage() {
                         <p className="text-xs text-gray-500">{vod.youtubeId}</p>
                       </div>
                     </div>
-                    <div className="flex gap-1 shrink-0">
+                    <div className="flex gap-1 shrink-0 flex-wrap justify-end">
+                      <Button
+                        variant={vod.embedEnabled ? 'outline' : 'default'}
+                        size="sm"
+                        onClick={() => handleToggleEmbed(vod.id, vod.embedEnabled)}
+                      >
+                        {vod.embedEnabled ? '숨기기' : '공개'}
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
@@ -210,9 +299,67 @@ export default function AdminVodPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* ── 예외 유저 관리 ───────────────────────────────────────── */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">예외 접근 유저 관리</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <form onSubmit={handleAddUser} className="space-y-3">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="이름"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  disabled={userAddLoading}
+                  required
+                  className="flex-1"
+                />
+                <Input
+                  placeholder="전화번호 (01012345678)"
+                  value={userPhone}
+                  onChange={(e) => setUserPhone(e.target.value)}
+                  disabled={userAddLoading}
+                  required
+                  className="flex-1"
+                />
+                <Button type="submit" disabled={userAddLoading} className="shrink-0">
+                  {userAddLoading ? '추가 중...' : '추가'}
+                </Button>
+              </div>
+              {userError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{userError}</AlertDescription>
+                </Alert>
+              )}
+            </form>
+
+            {usersLoading ? (
+              <p className="text-sm text-gray-500">불러오는 중...</p>
+            ) : users.length === 0 ? (
+              <p className="text-sm text-gray-500">등록된 예외 유저가 없습니다.</p>
+            ) : (
+              <ul className="space-y-1">
+                {users.map((user) => (
+                  <li key={user.id} className="flex items-center gap-2 p-2 bg-white rounded border text-sm">
+                    <span className="font-medium">{user.name}</span>
+                    <span className="text-gray-500">{user.phoneNum}</span>
+                    <div className="flex-1" />
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setDeleteUserTarget(user)}
+                    >삭제</Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      {/* 삭제 확인 다이얼로그 */}
+      {/* VOD 삭제 확인 다이얼로그 */}
       <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <DialogContent>
           <DialogHeader>
@@ -225,6 +372,24 @@ export default function AdminVodPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteTarget(null)}>취소</Button>
             <Button variant="destructive" onClick={() => deleteTarget && handleDelete(deleteTarget.id)}>
+              삭제
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 유저 삭제 확인 다이얼로그 */}
+      <Dialog open={!!deleteUserTarget} onOpenChange={() => setDeleteUserTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>예외 유저 삭제</DialogTitle>
+            <DialogDescription>
+              &quot;{deleteUserTarget?.name}&quot; ({deleteUserTarget?.phoneNum})을(를) 삭제하시겠습니까?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteUserTarget(null)}>취소</Button>
+            <Button variant="destructive" onClick={() => deleteUserTarget && handleDeleteUser(deleteUserTarget.id)}>
               삭제
             </Button>
           </DialogFooter>

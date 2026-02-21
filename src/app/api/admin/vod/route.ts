@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getVodList, addVod, deleteVod } from '@/lib/kv';
+import { getVodList, addVod, deleteVod, toggleVodEmbed } from '@/lib/kv';
 import { parseYoutubeId } from '@/lib/youtube';
 
 function isAdminAuthorized(request: NextRequest): boolean {
@@ -58,5 +58,27 @@ export async function DELETE(request: NextRequest) {
   }
 
   await deleteVod(id);
+  return NextResponse.json({ success: true });
+}
+
+export async function PATCH(request: NextRequest) {
+  if (!isAdminAuthorized(request)) {
+    return NextResponse.json({ message: '인증이 필요합니다.' }, { status: 401 });
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ message: '잘못된 요청입니다.' }, { status: 400 });
+  }
+
+  const { id, embedEnabled } = body as Record<string, unknown>;
+
+  if (typeof id !== 'number' || typeof embedEnabled !== 'boolean') {
+    return NextResponse.json({ message: 'id(number)와 embedEnabled(boolean)가 필요합니다.' }, { status: 400 });
+  }
+
+  await toggleVodEmbed(id, embedEnabled);
   return NextResponse.json({ success: true });
 }
