@@ -177,6 +177,7 @@ export default function VideoPlayer({ youtubeId }: { youtubeId: string }) {
         <div
           className="absolute inset-0 z-10 cursor-pointer"
           onClick={handlePlayPause}
+          onDoubleClick={(e) => e.preventDefault()}
           onContextMenu={(e) => e.preventDefault()}
         />
 

@@ -7,12 +7,23 @@ import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { verifyChallenge, setSession } from '@/lib/auth';
 
+function formatPhoneNum(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [name, setName] = useState('');
   const [phoneNum, setPhoneNum] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  function handlePhoneChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setPhoneNum(formatPhoneNum(e.target.value));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -65,9 +76,9 @@ export default function LoginPage() {
             <Input
               id="phoneNum"
               type="tel"
-              placeholder="01012345678"
+              placeholder="010-1234-5678"
               value={phoneNum}
-              onChange={(e) => setPhoneNum(e.target.value)}
+              onChange={handlePhoneChange}
               disabled={loading}
               required
             />

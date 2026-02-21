@@ -16,6 +16,13 @@ import {
 } from '@/components/ui/dialog';
 import { VodItem, AllowedUser, Banner } from '@/lib/types';
 
+function formatPhoneNum(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+}
+
 const AdminThumbnail = memo(function AdminThumbnail({
   youtubeId,
   title,
@@ -762,7 +769,7 @@ export default function AdminVodPage() {
                 <Input
                   placeholder="010-1234-5678"
                   value={userPhone}
-                  onChange={(e) => setUserPhone(e.target.value)}
+                  onChange={(e) => setUserPhone(formatPhoneNum(e.target.value))}
                   disabled={userAddLoading}
                   required
                   className="flex-1"
