@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: '인증이 필요합니다.' }, { status: 401 });
   }
 
-  const csvContent = '이름,전화번호\n홍길동,010-1234-5678\n';
+  const csvContent = '이름,전화번호\n홍길동,01012345678\n';
 
   return new NextResponse(csvContent, {
     status: 200,

@@ -30,9 +30,9 @@ export async function POST(request: NextRequest) {
   if (typeof name !== 'string' || name.trim().length === 0) {
     return NextResponse.json({ message: '이름을 입력해주세요.' }, { status: 400 });
   }
-  if (typeof phoneNum !== 'string' || !/^010-\d{4}-\d{4}$/.test(phoneNum)) {
+  if (typeof phoneNum !== 'string' || !/^010\d{8}$/.test(phoneNum)) {
     return NextResponse.json(
-      { message: '전화번호 형식이 올바르지 않습니다. (010-1234-5678)' },
+      { message: '전화번호 형식이 올바르지 않습니다. (01012345678)' },
       { status: 400 }
     );
   }

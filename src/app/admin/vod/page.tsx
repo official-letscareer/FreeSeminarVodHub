@@ -767,9 +767,9 @@ export default function AdminVodPage() {
                   className="flex-1"
                 />
                 <Input
-                  placeholder="010-1234-5678"
+                  placeholder="01012345678"
                   value={userPhone}
-                  onChange={(e) => setUserPhone(formatPhoneNum(e.target.value))}
+                  onChange={(e) => setUserPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
                   disabled={userAddLoading}
                   required
                   className="flex-1"
