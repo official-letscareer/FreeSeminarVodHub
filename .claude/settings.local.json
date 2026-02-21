@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)"
+    ],
+    "autoApprove": {
+      "enabled": true,
+      "actions": [
+        "read_files",
+        "write_files",
+        "execute_commands",
+        "browser_actions"
+      ]
+    }
+  }
+}
