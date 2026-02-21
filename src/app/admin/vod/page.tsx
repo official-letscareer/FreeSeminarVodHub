@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,44 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { VodItem, AllowedUser } from '@/lib/types';
+
+const AdminThumbnail = memo(function AdminThumbnail({
+  youtubeId,
+  title,
+}: {
+  youtubeId: string;
+  title: string;
+}) {
+  const [src, setSrc] = useState(`https://img.youtube.com/vi/${youtubeId}/default.jpg`);
+  const [failed, setFailed] = useState(false);
+
+  function handleError() {
+    if (src.includes('default.jpg') && !src.includes('hq')) {
+      setSrc(`https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`);
+    } else {
+      setFailed(true);
+    }
+  }
+
+  if (failed) {
+    return (
+      <div className="w-20 h-12 rounded shrink-0 bg-gray-200 flex items-center justify-center">
+        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+        </svg>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={title}
+      onError={handleError}
+      className="w-20 h-12 object-cover rounded shrink-0"
+    />
+  );
+});
 
 export default function AdminVodPage() {
   const router = useRouter();
@@ -380,11 +418,7 @@ export default function AdminVodPage() {
                     <span className="text-xs font-mono text-gray-400 w-5 text-center shrink-0">{index + 1}</span>
 
                     {/* 썸네일 + 정보 */}
-                    <img
-                      src={`https://img.youtube.com/vi/${vod.youtubeId}/default.jpg`}
-                      alt={vod.title}
-                      className="w-20 h-12 object-cover rounded shrink-0"
-                    />
+                    <AdminThumbnail youtubeId={vod.youtubeId} title={vod.title} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="font-medium text-sm truncate">{vod.title}</p>
