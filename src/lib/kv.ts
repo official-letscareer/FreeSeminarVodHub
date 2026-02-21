@@ -32,7 +32,7 @@ function getKv() {
 // ─── 공개 API ─────────────────────────────────────────────────────────────────
 export async function getVodList(): Promise<VodItem[]> {
   const store = getKv();
-  const list = await store.get<VodItem[]>(KV_KEYS.VOD_LIST);
+  const list = (await store.get(KV_KEYS.VOD_LIST)) as VodItem[] | null;
   if (!list) return [];
   return list.sort((a: VodItem, b: VodItem) => a.order - b.order);
 }
