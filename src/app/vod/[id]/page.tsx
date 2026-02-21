@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import VideoPlayer from '@/components/video-player';
+import CopyProtection from '@/components/copy-protection';
 import { VodItem } from '@/lib/types';
 
 export default function VodPlayerPage() {
@@ -38,6 +39,7 @@ export default function VodPlayerPage() {
   }, [id, router]);
 
   return (
+    <CopyProtection>
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b px-4 py-3 flex items-center gap-3">
         <Button
@@ -66,5 +68,6 @@ export default function VodPlayerPage() {
         ) : null}
       </main>
     </div>
+    </CopyProtection>
   );
 }

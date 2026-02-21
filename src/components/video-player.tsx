@@ -69,10 +69,10 @@ export default function VideoPlayer({ youtubeId }: { youtubeId: string }) {
       playerRef.current = new window.YT.Player(divRef.current, {
         videoId: youtubeId,
         playerVars: {
-          controls: 0,
+          controls: 0,        // 기본 컨트롤 숨김
           rel: 0,
           modestbranding: 1,
-          disablekb: 1,
+          disablekb: 1,       // 키보드 단축키 차단
           iv_load_policy: 3,
           playsinline: 1,
         },
@@ -147,32 +147,38 @@ export default function VideoPlayer({ youtubeId }: { youtubeId: string }) {
   }
 
   return (
-    <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden group select-none">
-      {/* YT player가 마운트될 div */}
-      <div ref={divRef} className="absolute inset-0 w-full h-full" />
+    <div className="w-full select-none">
+      {/* ── 영상 영역 ─────────────────────────────────────────────────── */}
+      <div className="relative w-full aspect-video bg-black rounded-t-lg overflow-hidden">
+        {/* YT 플레이어가 마운트될 div */}
+        <div ref={divRef} className="absolute inset-0 w-full h-full" />
 
-      {/* 로딩 스피너 */}
-      {!ready && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin" />
-        </div>
-      )}
+        {/* 투명 오버레이: iframe 직접 클릭 차단 (z-10) */}
+        <div
+          className="absolute inset-0 z-10"
+          onContextMenu={(e) => e.preventDefault()}
+        />
 
-      {/* 커스텀 컨트롤 - hover 시 표시 */}
-      {ready && (
-        <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
-          <CustomControls
-            playing={playing}
-            currentTime={currentTime}
-            duration={duration}
-            speed={speed}
-            onPlayPause={handlePlayPause}
-            onSeek={handleSeek}
-            onScrub={handleScrub}
-            onSpeedChange={handleSpeedChange}
-          />
-        </div>
-      )}
+        {/* 로딩 스피너 */}
+        {!ready && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+            <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+          </div>
+        )}
+      </div>
+
+      {/* ── 커스텀 컨트롤 (영상 아래) ─────────────────────────────────── */}
+      <CustomControls
+        playing={playing}
+        ready={ready}
+        currentTime={currentTime}
+        duration={duration}
+        speed={speed}
+        onPlayPause={handlePlayPause}
+        onSeek={handleSeek}
+        onScrub={handleScrub}
+        onSpeedChange={handleSpeedChange}
+      />
     </div>
   );
 }
