@@ -1,0 +1,23 @@
+[
+  {
+    "id": 1,
+    "title": "1주차 - 챌린지 OT & 직무 소개",
+    "youtubeId": "dQw4w9WgXcQ",
+    "order": 1,
+    "createdAt": "2025-01-01T09:00:00.000Z"
+  },
+  {
+    "id": 2,
+    "title": "2주차 - 이력서 작성법 & 자기소개서 전략",
+    "youtubeId": "ScMzIvxBSi4",
+    "order": 2,
+    "createdAt": "2025-01-08T09:00:00.000Z"
+  },
+  {
+    "id": 3,
+    "title": "3주차 - 직무 인터뷰 준비 & 면접 실전 팁",
+    "youtubeId": "J---aiyznGQ",
+    "order": 3,
+    "createdAt": "2025-01-15T09:00:00.000Z"
+  }
+]

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 function isValidName(name: unknown): name is string {
   return typeof name === 'string' && name.trim().length > 0;
@@ -34,7 +36,9 @@ export async function POST(request: NextRequest) {
   let isChallenge = false;
 
   if (mockMode) {
-    isChallenge = true;
+    const usersRaw = readFileSync(join(process.cwd(), 'mock-data', 'users.json'), 'utf-8');
+    const users: { name: string; phoneNum: string }[] = JSON.parse(usersRaw);
+    isChallenge = users.some((u) => u.name === name.trim() && u.phoneNum === phoneNum);
   } else {
     if (!apiUrl) {
       return NextResponse.json({ message: '서버 설정 오류입니다.' }, { status: 500 });

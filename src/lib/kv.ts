@@ -1,8 +1,24 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { VodItem } from './types';
 import { KV_KEYS } from './constants';
 
 // ─── 인메모리 목 스토어 (MOCK_MODE=true 전용) ───────────────────────────────
 const mockStore = new Map<string, unknown>();
+
+function initMockStore() {
+  if (mockStore.has(KV_KEYS.VOD_LIST)) return;
+  try {
+    const raw = readFileSync(join(process.cwd(), 'mock-data', 'vods.json'), 'utf-8');
+    const vods: VodItem[] = JSON.parse(raw);
+    mockStore.set(KV_KEYS.VOD_LIST, vods);
+    if (vods.length > 0) {
+      mockStore.set(KV_KEYS.VOD_COUNTER, Math.max(...vods.map((v) => v.id)));
+    }
+  } catch {
+    mockStore.set(KV_KEYS.VOD_LIST, []);
+  }
+}
 
 const mockKv = {
   async get<T>(key: string): Promise<T | null> {
@@ -22,6 +38,7 @@ const mockKv = {
 // ─── KV 인스턴스 선택 ─────────────────────────────────────────────────────────
 function getKv() {
   if (process.env.MOCK_MODE === 'true') {
+    initMockStore();
     return mockKv;
   }
   // eslint-disable-next-line @typescript-eslint/no-require-imports
