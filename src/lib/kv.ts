@@ -148,6 +148,12 @@ export async function deleteAllowedUser(id: number): Promise<void> {
   if (error) throw error;
 }
 
+export async function deleteAllowedUsers(ids: number[]): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await getSupabase().from('allowed_users').delete().in('id', ids);
+  if (error) throw error;
+}
+
 export async function isAllowedUser(
   name: string,
   phoneNum: string

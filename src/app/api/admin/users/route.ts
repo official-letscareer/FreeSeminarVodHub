@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllowedUsers, addAllowedUser, deleteAllowedUser } from '@/lib/kv';
+import { getAllowedUsers, addAllowedUser, deleteAllowedUser, deleteAllowedUsers } from '@/lib/kv';
 
 function isAdminAuthorized(request: NextRequest): boolean {
   return request.cookies.get('admin_verified')?.value === '1';
@@ -46,6 +46,24 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ message: '인증이 필요합니다.' }, { status: 401 });
   }
 
+  // 복수 삭제: body에 ids 배열
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    body = null;
+  }
+
+  if (body && typeof body === 'object' && 'ids' in body) {
+    const { ids } = body as { ids: unknown };
+    if (!Array.isArray(ids) || ids.some((id) => typeof id !== 'number')) {
+      return NextResponse.json({ message: 'ids는 숫자 배열이어야 합니다.' }, { status: 400 });
+    }
+    await deleteAllowedUsers(ids as number[]);
+    return NextResponse.json({ success: true });
+  }
+
+  // 단건 삭제: query param id
   const { searchParams } = new URL(request.url);
   const idParam = searchParams.get('id');
   const id = idParam ? parseInt(idParam, 10) : NaN;

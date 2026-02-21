@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,6 +40,11 @@ export default function AdminVodPage() {
   const [userAddLoading, setUserAddLoading] = useState(false);
   const [userError, setUserError] = useState('');
   const [deleteUserTarget, setDeleteUserTarget] = useState<AllowedUser | null>(null);
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<number>>(new Set());
+  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
+  const [csvUploadLoading, setCsvUploadLoading] = useState(false);
+  const [csvResult, setCsvResult] = useState<{ added: number; skipped: number; errors: string[] } | null>(null);
+  const csvInputRef = useRef<HTMLInputElement>(null);
 
   // ─── VOD 데이터 로드 ──────────────────────────────────────────────
   const fetchVodList = useCallback(async () => {
@@ -65,6 +70,7 @@ export default function AdminVodPage() {
       if (res.status === 401) return;
       const data = await res.json();
       setUsers(data);
+      setSelectedUserIds(new Set());
     } catch {
       // 유저 로드 실패 시 조용히 무시
     } finally {
@@ -203,10 +209,85 @@ export default function AdminVodPage() {
     }
   }
 
+  // ─── CSV 핸들러 ───────────────────────────────────────────────────
+  function handleDownloadTemplate() {
+    window.location.href = '/api/admin/users/csv-template';
+  }
+
+  async function handleCsvUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setCsvUploadLoading(true);
+    setCsvResult(null);
+    setUserError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/admin/users/csv-upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setCsvResult(data);
+        await fetchUsers();
+      } else {
+        setUserError(data.message || 'CSV 업로드에 실패했습니다.');
+      }
+    } catch {
+      setUserError('서버 연결에 실패했습니다.');
+    } finally {
+      setCsvUploadLoading(false);
+      if (csvInputRef.current) csvInputRef.current.value = '';
+    }
+  }
+
+  // ─── 체크박스 / 일괄 삭제 핸들러 ─────────────────────────────────
+  function toggleSelectUser(id: number) {
+    setSelectedUserIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selectedUserIds.size === users.length) {
+      setSelectedUserIds(new Set());
+    } else {
+      setSelectedUserIds(new Set(users.map((u) => u.id)));
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (selectedUserIds.size === 0) return;
+    setBulkDeleteLoading(true);
+    try {
+      await fetch('/api/admin/users', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedUserIds) }),
+      });
+      await fetchUsers();
+    } catch {
+      setUserError('일괄 삭제에 실패했습니다.');
+    } finally {
+      setBulkDeleteLoading(false);
+    }
+  }
+
   async function handleLogout() {
     await fetch('/api/admin/auth', { method: 'DELETE' });
     router.push('/admin');
   }
+
+  const allSelected = users.length > 0 && selectedUserIds.size === users.length;
+  const someSelected = selectedUserIds.size > 0;
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
@@ -369,6 +450,7 @@ export default function AdminVodPage() {
             <CardTitle className="text-lg">예외 접근 유저 관리</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* 개별 추가 폼 */}
             <form onSubmit={handleAddUser} className="space-y-3">
               <div className="flex gap-2">
                 <Input
@@ -380,7 +462,7 @@ export default function AdminVodPage() {
                   className="flex-1"
                 />
                 <Input
-                  placeholder="전화번호 (01012345678)"
+                  placeholder="010-1234-5678"
                   value={userPhone}
                   onChange={(e) => setUserPhone(e.target.value)}
                   disabled={userAddLoading}
@@ -391,32 +473,141 @@ export default function AdminVodPage() {
                   {userAddLoading ? '추가 중...' : '추가'}
                 </Button>
               </div>
-              {userError && (
-                <Alert variant="destructive">
-                  <AlertDescription>{userError}</AlertDescription>
-                </Alert>
-              )}
             </form>
 
+            {/* CSV 업로드 영역 */}
+            <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+              <div className="flex-1 text-sm text-gray-600">
+                CSV 파일로 유저 일괄 등록
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadTemplate}
+                className="shrink-0"
+              >
+                양식 다운로드
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => csvInputRef.current?.click()}
+                disabled={csvUploadLoading}
+                className="shrink-0"
+              >
+                {csvUploadLoading ? '업로드 중...' : 'CSV 업로드'}
+              </Button>
+              <input
+                ref={csvInputRef}
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={handleCsvUpload}
+              />
+            </div>
+
+            {/* CSV 업로드 결과 */}
+            {csvResult && (
+              <div className="text-sm p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="font-medium text-green-800">
+                  업로드 완료: {csvResult.added}명 추가, {csvResult.skipped}명 스킵
+                </p>
+                {csvResult.errors.length > 0 && (
+                  <ul className="mt-1 text-green-700 text-xs space-y-0.5">
+                    {csvResult.errors.map((e, i) => (
+                      <li key={i}>• {e}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {userError && (
+              <Alert variant="destructive">
+                <AlertDescription>{userError}</AlertDescription>
+              </Alert>
+            )}
+
+            {/* 유저 목록 테이블 */}
             {usersLoading ? (
               <p className="text-sm text-gray-500">불러오는 중...</p>
             ) : users.length === 0 ? (
               <p className="text-sm text-gray-500">등록된 예외 유저가 없습니다.</p>
             ) : (
-              <ul className="space-y-1">
-                {users.map((user) => (
-                  <li key={user.id} className="flex items-center gap-2 p-2 bg-white rounded border text-sm">
-                    <span className="font-medium">{user.name}</span>
-                    <span className="text-gray-500">{user.phoneNum}</span>
-                    <div className="flex-1" />
+              <div className="space-y-2">
+                {/* 일괄 삭제 툴바 */}
+                {someSelected && (
+                  <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                    <span className="text-sm text-blue-700 flex-1">
+                      {selectedUserIds.size}명 선택됨
+                    </span>
                     <Button
                       variant="destructive"
                       size="sm"
-                      onClick={() => setDeleteUserTarget(user)}
-                    >삭제</Button>
-                  </li>
-                ))}
-              </ul>
+                      onClick={handleBulkDelete}
+                      disabled={bulkDeleteLoading}
+                    >
+                      {bulkDeleteLoading ? '삭제 중...' : '선택 삭제'}
+                    </Button>
+                  </div>
+                )}
+
+                {/* 테이블 */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 bg-gray-50">
+                        <th className="w-10 p-2 text-left">
+                          <input
+                            type="checkbox"
+                            checked={allSelected}
+                            onChange={toggleSelectAll}
+                            className="rounded"
+                          />
+                        </th>
+                        <th className="p-2 text-left font-medium text-gray-600">이름</th>
+                        <th className="p-2 text-left font-medium text-gray-600">전화번호</th>
+                        <th className="p-2 text-left font-medium text-gray-600">등록일</th>
+                        <th className="w-16 p-2"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users.map((user) => (
+                        <tr
+                          key={user.id}
+                          className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${selectedUserIds.has(user.id) ? 'bg-blue-50' : ''}`}
+                        >
+                          <td className="p-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedUserIds.has(user.id)}
+                              onChange={() => toggleSelectUser(user.id)}
+                              className="rounded"
+                            />
+                          </td>
+                          <td className="p-2 font-medium">{user.name}</td>
+                          <td className="p-2 text-gray-600">{user.phoneNum}</td>
+                          <td className="p-2 text-gray-400 text-xs">
+                            {new Date(user.createdAt).toLocaleDateString('ko-KR')}
+                          </td>
+                          <td className="p-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeleteUserTarget(user)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 h-7 px-2"
+                            >
+                              삭제
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
