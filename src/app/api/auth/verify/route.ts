@@ -91,8 +91,19 @@ export async function POST(request: NextRequest) {
         isChallenge = false;
       } else if (res.ok) {
         const data = await res.json();
-        isChallenge = data?.data?.isChallenge === true;
+        console.log('verify-challenge response:', JSON.stringify(data));
+        if (typeof data === 'boolean') {
+          isChallenge = data;
+        } else if (typeof data?.data === 'boolean') {
+          isChallenge = data.data;
+        } else if (typeof data?.data?.isChallenge === 'boolean') {
+          isChallenge = data.data.isChallenge;
+        } else if (typeof data?.isChallenge === 'boolean') {
+          isChallenge = data.isChallenge;
+        }
       } else {
+        const errorBody = await res.text().catch(() => '');
+        console.error(`verify-challenge failed: status=${res.status}, body=${errorBody}`);
         return NextResponse.json({ message: '서버 연결에 실패했습니다.' }, { status: 502 });
       }
     } catch {
