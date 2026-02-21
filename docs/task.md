@@ -88,14 +88,14 @@
         - [x] 1.3.1 TypeScript 타입 체크 통과 확인
         - [x] 1.3.2 오류 수정 (필요 시)
 
-    - [ ] 1.4 환경변수 설정 및 Vercel KV 연결 (커밋 단위)
+    - [x] 1.4 환경변수 설정 및 Vercel KV 연결 (커밋 단위)
         - `.env.local` 생성 (PRD 12번 환경변수 참고)
         - `@vercel/kv` 패키지 설치
         - `src/lib/kv.ts` — KV 연결 및 기본 CRUD 유틸 함수 작성
             - `getVodList()`, `addVod()`, `deleteVod()`, `updateVodOrder()`, `getNextId()`
-        - [ ] 1.4.1 테스트 코드 작성 (`__tests__/lib/kv.test.ts`)
-        - [ ] 1.4.2 테스트 실행 및 검증
-        - [ ] 1.4.3 오류 수정 (필요 시)
+        - [x] 1.4.1 테스트 코드 작성 (`__tests__/lib/kv.test.ts`)
+        - [x] 1.4.2 테스트 실행 및 검증
+        - [x] 1.4.3 오류 수정 (필요 시)
 
     - [ ] 1.5 루트 레이아웃 및 리다이렉트 설정 (커밋 단위)
         - `src/app/layout.tsx` — 기본 레이아웃 (폰트, 메타데이터)
