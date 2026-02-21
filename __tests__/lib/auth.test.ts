@@ -29,6 +29,11 @@ describe('auth utils', () => {
       });
       const result = await verifyChallenge('홍길동', '01012345678');
       expect(result).toBe(true);
+      expect(global.fetch).toHaveBeenCalledWith('/api/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: '홍길동', phoneNum: '01012345678' }),
+      });
     });
 
     it('서버가 isChallenge: false 응답 시 false 반환', async () => {
@@ -45,6 +50,11 @@ describe('auth utils', () => {
       const result = await verifyChallenge('홍길동', '01012345678');
       expect(result).toBe(false);
     });
+
+    it('네트워크 에러 시 예외 발생', async () => {
+      (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
+      await expect(verifyChallenge('홍길동', '01012345678')).rejects.toThrow('Network error');
+    });
   });
 
   describe('session', () => {
@@ -55,6 +65,7 @@ describe('auth utils', () => {
       expect(session?.name).toBe('홍길동');
       expect(session?.phoneNum).toBe('01012345678');
       expect(session?.isVerified).toBe(true);
+      expect(session?.verifiedAt).toBeDefined();
     });
 
     it('clearSession 후 getSession null 반환', () => {
@@ -63,7 +74,12 @@ describe('auth utils', () => {
       expect(getSession()).toBeNull();
     });
 
-    it('sessionStorage 없을 때 getSession null 반환', () => {
+    it('sessionStorage 비어있을 때 getSession null 반환', () => {
+      expect(getSession()).toBeNull();
+    });
+
+    it('sessionStorage에 잘못된 JSON이 있을 때 null 반환', () => {
+      mockSessionStorage.getItem.mockReturnValueOnce('invalid-json');
       expect(getSession()).toBeNull();
     });
   });
@@ -77,6 +93,10 @@ describe('auth utils', () => {
     it('clearAdminSession 후 getAdminSession false 반환', () => {
       setAdminSession();
       clearAdminSession();
+      expect(getAdminSession()).toBe(false);
+    });
+
+    it('admin 세션 미설정 시 false 반환', () => {
       expect(getAdminSession()).toBe(false);
     });
   });

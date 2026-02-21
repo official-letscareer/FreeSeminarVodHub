@@ -26,11 +26,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: '잘못된 요청입니다.' }, { status: 400 });
   }
 
-  const { name, phoneNum } = body as Record<string, unknown>;
+  const { name, phoneNum: rawPhone } = body as Record<string, unknown>;
+  console.log('verify request body:', JSON.stringify({ name, phoneNum: rawPhone }));
 
   if (!isValidName(name)) {
     return NextResponse.json({ message: '이름을 입력해주세요.' }, { status: 400 });
   }
+
+  // 하이픈, 공백 자동 제거
+  const phoneNum = typeof rawPhone === 'string' ? rawPhone.replace(/[-\s]/g, '') : rawPhone;
+
   if (!isValidPhone(phoneNum)) {
     return NextResponse.json(
       { message: '전화번호 형식이 올바르지 않습니다. (010으로 시작하는 11자리)' },
@@ -66,10 +71,12 @@ export async function POST(request: NextRequest) {
   // 1) 예외 유저 테이블 확인
   try {
     const allowed = await isAllowedUser(trimmedName, phoneNum);
+    console.log('isAllowedUser result:', allowed);
     if (allowed) {
       isChallenge = true;
     }
-  } catch {
+  } catch (err) {
+    console.error('isAllowedUser error:', err);
     // Supabase 연결 실패 시 외부 API로 폴백
   }
 
@@ -80,12 +87,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: '서버 설정 오류입니다.' }, { status: 500 });
     }
     try {
-      const res = await fetch(`${apiUrl}/api/v2/user/verify-challenge`, {
+      // 외부 API에는 원본 전화번호 전달 (하이픈 포함 형식으로 매칭)
+      const requestBody = JSON.stringify({ name: trimmedName, phoneNum: rawPhone });
+      const fullUrl = `${apiUrl}/api/v2/user/verify-challenge`;
+      console.log('verify-challenge URL:', fullUrl);
+      console.log('verify-challenge request:', requestBody);
+      const res = await fetch(fullUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: trimmedName, phoneNum }),
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: requestBody,
       });
 
+      console.log('verify-challenge API status:', res.status);
       if (res.status === 404) {
         // 가입되지 않은 사용자
         isChallenge = false;
