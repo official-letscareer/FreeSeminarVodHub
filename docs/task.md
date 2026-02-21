@@ -196,14 +196,14 @@
 
 - [ ] **4.0 유저 VOD 목록 + 재생 페이지** (Push 단위)
 
-    - [ ] 4.1 VOD 조회 API 구현 (커밋 단위)
+    - [x] 4.1 VOD 조회 API 구현 (커밋 단위)
         - `src/app/api/vod/route.ts`
             - `GET` — Vercel KV에서 VOD 목록 조회 (order 순 정렬)
         - `src/app/api/vod/[id]/route.ts`
             - `GET` — VOD 단건 조회 (youtubeId 포함)
-        - [ ] 4.1.1 테스트 코드 작성 (`__tests__/api/vod.test.ts`)
-        - [ ] 4.1.2 테스트 실행 및 검증
-        - [ ] 4.1.3 오류 수정 (필요 시)
+        - [x] 4.1.1 테스트 코드 작성 (`__tests__/api/vod.test.ts`)
+        - [x] 4.1.2 테스트 실행 및 검증
+        - [x] 4.1.3 오류 수정 (필요 시)
 
     - [ ] 4.2 VOD 카드 컴포넌트 구현 (커밋 단위)
         - `src/components/vod-card.tsx`
