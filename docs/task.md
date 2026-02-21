@@ -152,13 +152,13 @@
 
 - [ ] **3.0 관리자 페이지 (VOD CRUD)** (Push 단위)
 
-    - [ ] 3.1 관리자 인증 API 구현 (커밋 단위)
+    - [x] 3.1 관리자 인증 API 구현 (커밋 단위)
         - `src/app/api/admin/auth/route.ts`
             - `POST` — 비밀번호를 받아서 `ADMIN_PASSWORD` 환경변수와 비교
             - 일치하면 관리자 세션 쿠키 설정
-        - [ ] 3.1.1 테스트 코드 작성 (`__tests__/api/admin-vod.test.ts`)
-        - [ ] 3.1.2 테스트 실행 및 검증
-        - [ ] 3.1.3 오류 수정 (필요 시)
+        - [x] 3.1.1 테스트 코드 작성 (`__tests__/api/admin-vod.test.ts`)
+        - [x] 3.1.2 테스트 실행 및 검증
+        - [x] 3.1.3 오류 수정 (필요 시)
 
     - [ ] 3.2 관리자 VOD CRUD API 구현 (커밋 단위)
         - `src/app/api/admin/vod/route.ts`
