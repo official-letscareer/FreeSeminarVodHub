@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import VodCard from '@/components/vod-card';
+import BannerCarousel from '@/components/banner-carousel';
 import { VodItem } from '@/lib/types';
 
 export default function VodListPage() {
@@ -44,6 +45,7 @@ export default function VodListPage() {
         </Button>
       </header>
 
+      <BannerCarousel position="list" />
       <main className="max-w-5xl mx-auto px-4 py-6">
         {error && (
           <p className="text-center text-sm text-red-500 mb-4">{error}</p>

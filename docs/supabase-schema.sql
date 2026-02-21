@@ -31,7 +31,22 @@ CREATE TABLE rate_limits (
 
 CREATE INDEX idx_rate_limits_key_created ON rate_limits (key, created_at);
 
+-- 배너 테이블
+CREATE TABLE banners (
+  id BIGSERIAL PRIMARY KEY,
+  image_url TEXT NOT NULL,
+  link_url TEXT NOT NULL DEFAULT '',
+  position TEXT NOT NULL DEFAULT 'both' CHECK (position IN ('list', 'player', 'both')),
+  "order" INT NOT NULL DEFAULT 0,
+  is_random BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 기존 테이블에 추가 시 (마이그레이션용)
+-- CREATE TABLE IF NOT EXISTS banners ( ... );
+
 -- RLS 비활성화 (API Routes에서 인증 처리)
 ALTER TABLE vods DISABLE ROW LEVEL SECURITY;
 ALTER TABLE allowed_users DISABLE ROW LEVEL SECURITY;
 ALTER TABLE rate_limits DISABLE ROW LEVEL SECURITY;
+ALTER TABLE banners DISABLE ROW LEVEL SECURITY;

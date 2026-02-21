@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { VodItem, AllowedUser } from './types';
+import { VodItem, AllowedUser, Banner } from './types';
 
 function getSupabase() {
   if (!supabase) throw new Error('Supabase가 설정되지 않았습니다.');
@@ -183,6 +183,94 @@ export async function isAllowedUser(
 
   if (error) throw error;
   return (data?.length ?? 0) > 0;
+}
+
+// ─── Banner CRUD ─────────────────────────────────────────────────────────────
+function toBanner(row: Record<string, unknown>): Banner {
+  return {
+    id: row.id as number,
+    imageUrl: row.image_url as string,
+    linkUrl: (row.link_url as string) ?? '',
+    position: (row.position as Banner['position']) ?? 'both',
+    order: row.order as number,
+    isRandom: (row.is_random as boolean) ?? false,
+    createdAt: row.created_at as string,
+  };
+}
+
+export async function getBanners(position?: Banner['position']): Promise<Banner[]> {
+  let query = getSupabase()
+    .from('banners')
+    .select('*')
+    .order('order', { ascending: true });
+
+  if (position && position !== 'both') {
+    query = query.in('position', [position, 'both']);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []).map(toBanner);
+}
+
+export async function addBanner(data: {
+  imageUrl: string;
+  linkUrl: string;
+  position: Banner['position'];
+  isRandom: boolean;
+}): Promise<Banner> {
+  const { data: maxRow } = await getSupabase()
+    .from('banners')
+    .select('order')
+    .order('order', { ascending: false })
+    .limit(1)
+    .single();
+
+  const nextOrder = maxRow ? (maxRow.order as number) + 1 : 1;
+
+  const { data: inserted, error } = await getSupabase()
+    .from('banners')
+    .insert({
+      image_url: data.imageUrl,
+      link_url: data.linkUrl,
+      position: data.position,
+      order: nextOrder,
+      is_random: data.isRandom,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return toBanner(inserted);
+}
+
+export async function deleteBanner(id: number): Promise<void> {
+  const { data } = await getSupabase()
+    .from('banners')
+    .select('image_url')
+    .eq('id', id)
+    .single();
+
+  const { error } = await getSupabase().from('banners').delete().eq('id', id);
+  if (error) throw error;
+
+  // Supabase Storage에서 이미지 삭제 (실패해도 무시)
+  if (data?.image_url) {
+    const url = data.image_url as string;
+    const pathMatch = url.match(/\/banners\/(.+)$/);
+    if (pathMatch) {
+      getSupabase().storage.from('banners').remove([pathMatch[1]]).then(() => {});
+    }
+  }
+}
+
+export async function updateBannerOrder(orderedIds: number[]): Promise<void> {
+  for (let i = 0; i < orderedIds.length; i++) {
+    await getSupabase()
+      .from('banners')
+      .update({ order: i + 1 })
+      .eq('id', orderedIds[i]);
+  }
 }
 
 // ─── Rate Limiting ───────────────────────────────────────────────────────────

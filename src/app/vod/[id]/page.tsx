@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import VideoPlayer from '@/components/video-player';
 import CopyProtection from '@/components/copy-protection';
+import BannerCarousel from '@/components/banner-carousel';
 import { VodItem } from '@/lib/types';
 
 export default function VodPlayerPage() {
@@ -63,6 +64,7 @@ export default function VodPlayerPage() {
         ) : vod ? (
           <div className="space-y-3">
             <VideoPlayer youtubeId={vod.youtubeId} />
+            <BannerCarousel position="player" />
             <div>
               <p className="text-sm font-medium text-gray-800">{vod.title}</p>
               {vod.publishedAt && (

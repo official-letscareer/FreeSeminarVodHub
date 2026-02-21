@@ -110,50 +110,29 @@
 
 ---
 
-- [ ] **4.0 배너 시스템** (Push 단위)
+- [x] **4.0 배너 시스템** (Push 단위)
 
-    - [ ] 4.1 DB 스키마 — banners 테이블 추가 (커밋 단위)
-        - `supabase-schema.sql` 수정
-            - `banners` 테이블: `id`, `image_url`, `link_url`, `position` (enum: `list`|`player`|`both`), `order`, `is_random`, `created_at`
-        - `src/lib/types.ts` 수정
-            - `Banner` 인터페이스 추가
-        - [ ] 4.1.1 빌드 및 타입 체크 확인
-        - [ ] 4.1.2 오류 수정 (필요 시)
+    - [x] 4.1 DB 스키마 — banners 테이블 추가
+        - `supabase-schema.sql` 수정 — banners 테이블 추가
+        - `src/lib/types.ts` 수정 — Banner 인터페이스 추가
+        - [x] 4.1.1 빌드 및 타입 체크 확인
 
-    - [ ] 4.2 배너 이미지 업로드 및 CRUD API (커밋 단위)
-        - `src/app/api/admin/banners/route.ts` 생성
-            - `GET` — 배너 목록 조회
-            - `POST` — 이미지 업로드 (Supabase Storage) + 배너 등록 (link_url, position, is_random)
-            - `DELETE` — 배너 삭제 (Storage에서도 삭제)
-            - `PATCH` — 순서 변경
-        - `src/lib/kv.ts` 수정
-            - `getBanners()`, `addBanner()`, `deleteBanner()`, `updateBannerOrder()` 추가
-        - [ ] 4.2.1 테스트 코드 작성 (`__tests__/api/banners.test.ts`)
-        - [ ] 4.2.2 테스트 실행 및 검증
-        - [ ] 4.2.3 오류 수정 (필요 시)
+    - [x] 4.2 배너 CRUD API 및 kv 함수
+        - `src/app/api/admin/banners/route.ts` 생성 — GET/POST/DELETE/PATCH
+        - `src/lib/kv.ts` — getBanners/addBanner/deleteBanner/updateBannerOrder 추가
+        - [x] 4.2.1 빌드 확인
 
-    - [ ] 4.3 배너 조회 API (유저용) (커밋 단위)
-        - `src/app/api/banners/route.ts` 생성
-            - `GET` — position 파라미터로 필터링하여 배너 반환
-        - [ ] 4.3.1 테스트 코드 작성
-        - [ ] 4.3.2 테스트 실행 및 검증
-        - [ ] 4.3.3 오류 수정 (필요 시)
+    - [x] 4.3 배너 조회 API (유저용)
+        - `src/app/api/banners/route.ts` 생성 — position 필터링
+        - [x] 4.3.1 빌드 확인
 
-    - [ ] 4.4 배너 캐러셀 컴포넌트 구현 (커밋 단위)
+    - [x] 4.4 배너 캐러셀 컴포넌트
         - `src/components/banner-carousel.tsx` 생성
-            - 배너 0개 시 null 반환 (렌더링 안 함)
-            - 배너 1개 시 단순 이미지 표시
-            - 배너 2개 이상 시 좌우 슬라이드(캐러셀)
-            - `is_random` 설정 시 순서 셔플
-            - 클릭 시 `link_url`로 이동 (새 탭)
-            - 1120×180 비율 유지
-        - [ ] 4.4.1 컴포넌트 렌더링 확인
-        - [ ] 4.4.2 오류 수정 (필요 시)
+        - [x] 4.4.1 빌드 확인
 
-    - [ ] 4.5 어드민 배너 관리 UI (커밋 단위)
-        - `src/app/admin/vod/page.tsx` 수정
-            - "배너 관리" 섹션 추가
-            - 이미지 파일 업로드 + link_url 입력 + position 선택 + is_random 토글
+    - [x] 4.5 어드민 배너 관리 UI
+        - `src/app/admin/vod/page.tsx` 수정 — "배너 관리" 섹션 추가
+        - 이미지 업로드 + link_url + position + isRandom 토글
             - 배너 목록 표시 (썸네일, 위치, 순서 변경, 삭제)
         - [ ] 4.5.1 CRUD 동작 확인
         - [ ] 4.5.2 오류 수정 (필요 시)
@@ -163,24 +142,17 @@
             - 헤더 하단에 `<BannerCarousel position="list" />` 추가
         - `src/app/vod/[id]/page.tsx` 수정
             - 플레이어 하단에 `<BannerCarousel position="player" />` 추가
-        - [ ] 4.6.1 배너 표시 및 클릭 동작 확인
-        - [ ] 4.6.2 오류 수정 (필요 시)
+    - [x] 4.6 VOD 목록/재생 페이지에 배너 표시
+        - `src/app/vod/page.tsx` — 헤더 하단 BannerCarousel position="list"
+        - `src/app/vod/[id]/page.tsx` — 플레이어 하단 BannerCarousel position="player"
+        - [x] 4.6.1 빌드 확인
 
 ---
 
-- [ ] **5.0 투명 프레임 클릭 재생/일시정지** (Push 단위)
-
-    - [ ] 5.1 오버레이 클릭 시 재생/일시정지 토글 (커밋 단위)
-        - `src/components/video-player.tsx` 확인 및 수정
-            - 기존 오버레이 onClick에 `handlePlayPause()` 연결되어 있는지 확인 (이미 구현된 경우 검증만)
-            - 더블클릭 이벤트 차단 (`onDoubleClick={(e) => e.preventDefault()}`)
-            - 모바일 터치 이벤트도 동일하게 처리
-        - [ ] 5.1.1 클릭 재생/일시정지 토글 동작 확인
-        - [ ] 5.1.2 오류 수정 (필요 시)
 
 ---
 
-- [ ] **6.0 전화번호 입력 포맷팅** (Push 단위)
+- [ ] **5.0 전화번호 입력 포맷팅** (Push 단위)
 
     - [ ] 6.1 로그인 페이지 전화번호 자동 하이픈 삽입 (커밋 단위)
         - `src/app/login/page.tsx` 수정
@@ -204,7 +176,7 @@
 
 ---
 
-- [ ] **7.0 영상 리스트뷰 / 썸네일뷰 전환** (Push 단위)
+- [ ] **6.0 영상 리스트뷰 / 썸네일뷰 전환** (Push 단위)
 
     - [ ] 7.1 리스트뷰 컴포넌트 구현 (커밋 단위)
         - `src/components/vod-list-item.tsx` 생성

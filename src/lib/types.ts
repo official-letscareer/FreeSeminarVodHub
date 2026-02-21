@@ -16,6 +16,16 @@ export interface AllowedUser {
   createdAt: string;
 }
 
+export interface Banner {
+  id: number;
+  imageUrl: string;
+  linkUrl: string;
+  position: 'list' | 'player' | 'both';
+  order: number;
+  isRandom: boolean;
+  createdAt: string;
+}
+
 export interface AuthSession {
   name: string;
   phoneNum: string;
