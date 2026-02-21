@@ -64,10 +64,16 @@ export async function POST(request: NextRequest) {
   let isChallenge = false;
 
   // 1) 예외 유저 테이블 확인
-  const allowed = await isAllowedUser(trimmedName, phoneNum);
-  if (allowed) {
-    isChallenge = true;
-  } else {
+  try {
+    const allowed = await isAllowedUser(trimmedName, phoneNum);
+    if (allowed) {
+      isChallenge = true;
+    }
+  } catch {
+    // Supabase 연결 실패 시 외부 API로 폴백
+  }
+
+  if (!isChallenge) {
     // 2) 렛츠커리어 서버 v2 API 호출
     const apiUrl = process.env.LETSCAREER_API_URL;
     if (!apiUrl) {
