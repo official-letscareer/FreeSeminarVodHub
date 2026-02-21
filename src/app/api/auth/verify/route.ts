@@ -31,25 +31,34 @@ export async function POST(request: NextRequest) {
   const mockMode = process.env.MOCK_MODE === 'true';
   const apiUrl = process.env.LETSCAREER_API_URL;
 
+  let isChallenge = false;
+
   if (mockMode) {
-    return NextResponse.json({ isChallenge: true });
+    isChallenge = true;
+  } else {
+    if (!apiUrl) {
+      return NextResponse.json({ message: '서버 설정 오류입니다.' }, { status: 500 });
+    }
+    try {
+      const res = await fetch(`${apiUrl}/api/v1/user/verify-challenge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), phoneNum }),
+      });
+      const data = await res.json();
+      isChallenge = data?.data?.isChallenge === true;
+    } catch {
+      return NextResponse.json({ message: '서버 연결에 실패했습니다.' }, { status: 502 });
+    }
   }
 
-  if (!apiUrl) {
-    return NextResponse.json({ message: '서버 설정 오류입니다.' }, { status: 500 });
-  }
-
-  try {
-    const res = await fetch(`${apiUrl}/api/v1/user/verify-challenge`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.trim(), phoneNum }),
+  const response = NextResponse.json({ isChallenge });
+  if (isChallenge) {
+    response.cookies.set('auth_verified', '1', {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
     });
-
-    const data = await res.json();
-    const isChallenge = data?.data?.isChallenge === true;
-    return NextResponse.json({ isChallenge });
-  } catch {
-    return NextResponse.json({ message: '서버 연결에 실패했습니다.' }, { status: 502 });
   }
+  return response;
 }
