@@ -56,7 +56,7 @@ export default function VodCard({ vod }: { vod: VodItem }) {
           <p className="text-xs text-gray-400 mt-0.5">{vod.publishedAt}</p>
         )}
         {vod.description && (
-          <p className="text-xs text-gray-500 mt-1 line-clamp-1">{vod.description}</p>
+          <p className="text-xs text-gray-500 mt-1 line-clamp-2">{vod.description}</p>
         )}
       </div>
     </div>

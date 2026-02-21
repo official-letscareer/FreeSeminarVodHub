@@ -6,11 +6,18 @@ function isAdminAuthorized(request: NextRequest): boolean {
 }
 
 function parsePhoneNum(raw: string): string {
-  return raw.trim().replace(/[^0-9-]/g, '');
+  const digits = raw.trim().replace(/\D/g, '');
+  // 숫자 11자리면 하이픈 삽입
+  if (/^010\d{8}$/.test(digits)) {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  }
+  // 이미 하이픈 포함 형태
+  const withHyphen = raw.trim().replace(/[^0-9-]/g, '');
+  return withHyphen;
 }
 
 function isValidPhoneNum(phoneNum: string): boolean {
-  return /^010-\d{4}-\d{4}$/.test(phoneNum) || /^010\d{8}$/.test(phoneNum);
+  return /^010-\d{4}-\d{4}$/.test(phoneNum);
 }
 
 export async function POST(request: NextRequest) {

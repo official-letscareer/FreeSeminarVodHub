@@ -70,10 +70,12 @@ export default function VodPlayerPage() {
                 <p className="text-xs text-gray-400 mt-0.5">{vod.publishedAt}</p>
               )}
               {vod.description && (
-                <p className="text-sm text-gray-500 mt-1 whitespace-pre-line">{vod.description}</p>
+                <p className="text-sm text-gray-500 mt-2 whitespace-pre-line">{vod.description}</p>
               )}
             </div>
-            <BannerCarousel position="player" />
+            <div className="pt-2">
+              <BannerCarousel position="player" />
+            </div>
           </div>
         ) : null}
       </main>

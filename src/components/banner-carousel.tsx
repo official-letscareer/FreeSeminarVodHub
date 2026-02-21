@@ -46,7 +46,7 @@ export default function BannerCarousel({ position }: Props) {
       {/* 배너 이미지 */}
       {banner.linkUrl ? (
         <a
-          href={banner.linkUrl}
+          href={banner.linkUrl.startsWith('http') ? banner.linkUrl : `https://${banner.linkUrl}`}
           target="_blank"
           rel="noopener noreferrer"
           className="block cursor-pointer"
