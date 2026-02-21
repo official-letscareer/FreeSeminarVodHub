@@ -55,7 +55,8 @@ export async function POST(request: NextRequest) {
     .upload(fileName, arrayBuffer, { contentType: fileObj.type, upsert: false });
 
   if (uploadError) {
-    return NextResponse.json({ message: '이미지 업로드에 실패했습니다.' }, { status: 500 });
+    console.error('[Banner Upload Error]', uploadError);
+    return NextResponse.json({ message: `이미지 업로드 실패: ${uploadError.message}` }, { status: 500 });
   }
 
   const { data: urlData } = supabase.storage.from('banners').getPublicUrl(fileName);

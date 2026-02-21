@@ -64,7 +64,6 @@ export default function VodPlayerPage() {
         ) : vod ? (
           <div className="space-y-3">
             <VideoPlayer youtubeId={vod.youtubeId} />
-            <BannerCarousel position="player" />
             <div>
               <p className="text-sm font-medium text-gray-800">{vod.title}</p>
               {vod.publishedAt && (
@@ -74,6 +73,7 @@ export default function VodPlayerPage() {
                 <p className="text-sm text-gray-500 mt-1 whitespace-pre-line">{vod.description}</p>
               )}
             </div>
+            <BannerCarousel position="player" />
           </div>
         ) : null}
       </main>

@@ -44,21 +44,32 @@ export default function BannerCarousel({ position }: Props) {
   return (
     <div className="relative w-full overflow-hidden rounded-lg bg-gray-100">
       {/* 배너 이미지 */}
-      <a
-        href={banner.linkUrl || undefined}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={banner.linkUrl ? 'cursor-pointer' : 'cursor-default'}
-        onClick={(e) => !banner.linkUrl && e.preventDefault()}
-      >
-        <img
-          src={banner.imageUrl}
-          alt="배너"
-          className="w-full object-cover"
-          style={{ aspectRatio: '1120 / 180' }}
-          draggable={false}
-        />
-      </a>
+      {banner.linkUrl ? (
+        <a
+          href={banner.linkUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block cursor-pointer"
+        >
+          <img
+            src={banner.imageUrl}
+            alt="배너"
+            className="w-full object-cover"
+            style={{ aspectRatio: '1120 / 180' }}
+            draggable={false}
+          />
+        </a>
+      ) : (
+        <div className="cursor-default">
+          <img
+            src={banner.imageUrl}
+            alt="배너"
+            className="w-full object-cover"
+            style={{ aspectRatio: '1120 / 180' }}
+            draggable={false}
+          />
+        </div>
+      )}
 
       {/* 복수 배너 시 네비게이션 */}
       {banners.length > 1 && (
