@@ -107,16 +107,16 @@
 
 - [ ] **2.0 유저 인증 (로그인 + 챌린지 검증)** (Push 단위)
 
-    - [ ] 2.1 인증 유틸 함수 작성 (커밋 단위)
+    - [x] 2.1 인증 유틸 함수 작성 (커밋 단위)
         - `src/lib/auth.ts` 작성
             - `verifyChallenge(name, phoneNum)` — 서버 검증 호출 (목 모드 포함)
             - `getSession()` — sessionStorage에서 인증 상태 조회
             - `setSession(data)` — sessionStorage에 인증 상태 저장
             - `clearSession()` — 세션 삭제
             - `MOCK_MODE` 플래그 — 백엔드 완성 전 임시 통과용
-        - [ ] 2.1.1 테스트 코드 작성 (`__tests__/lib/auth.test.ts`)
-        - [ ] 2.1.2 테스트 실행 및 검증
-        - [ ] 2.1.3 오류 수정 (필요 시)
+        - [x] 2.1.1 테스트 코드 작성 (`__tests__/lib/auth.test.ts`)
+        - [x] 2.1.2 테스트 실행 및 검증
+        - [x] 2.1.3 오류 수정 (필요 시)
 
     - [ ] 2.2 챌린지 검증 API 프록시 작성 (커밋 단위)
         - `src/app/api/auth/verify/route.ts`
