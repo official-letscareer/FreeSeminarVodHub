@@ -1,6 +1,11 @@
 import { supabase } from './supabase';
 import { VodItem, AllowedUser } from './types';
 
+function getSupabase() {
+  if (!supabase) throw new Error('Supabase가 설정되지 않았습니다.');
+  return supabase;
+}
+
 // ─── Supabase row → VodItem 변환 ─────────────────────────────────────────────
 function toVodItem(row: Record<string, unknown>): VodItem {
   return {
@@ -24,7 +29,7 @@ function toAllowedUser(row: Record<string, unknown>): AllowedUser {
 
 // ─── VOD CRUD ─────────────────────────────────────────────────────────────────
 export async function getVodList(): Promise<VodItem[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('vods')
     .select('*')
     .order('order', { ascending: true });
@@ -34,7 +39,7 @@ export async function getVodList(): Promise<VodItem[]> {
 }
 
 export async function getEnabledVodList(): Promise<VodItem[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('vods')
     .select('*')
     .eq('embed_enabled', true)
@@ -47,7 +52,7 @@ export async function getEnabledVodList(): Promise<VodItem[]> {
 export async function addVod(
   data: Pick<VodItem, 'title' | 'youtubeId'>
 ): Promise<VodItem> {
-  const { data: maxRow } = await supabase
+  const { data: maxRow } = await getSupabase()
     .from('vods')
     .select('order')
     .order('order', { ascending: false })
@@ -56,7 +61,7 @@ export async function addVod(
 
   const nextOrder = maxRow ? (maxRow.order as number) + 1 : 1;
 
-  const { data: inserted, error } = await supabase
+  const { data: inserted, error } = await getSupabase()
     .from('vods')
     .insert({
       title: data.title,
@@ -72,13 +77,13 @@ export async function addVod(
 }
 
 export async function deleteVod(id: number): Promise<void> {
-  const { error } = await supabase.from('vods').delete().eq('id', id);
+  const { error } = await getSupabase().from('vods').delete().eq('id', id);
   if (error) throw error;
 
   // order 재정렬
   const list = await getVodList();
   for (let i = 0; i < list.length; i++) {
-    await supabase
+    await getSupabase()
       .from('vods')
       .update({ order: i + 1 })
       .eq('id', list[i].id);
@@ -87,7 +92,7 @@ export async function deleteVod(id: number): Promise<void> {
 
 export async function updateVodOrder(orderedIds: number[]): Promise<VodItem[]> {
   for (let i = 0; i < orderedIds.length; i++) {
-    await supabase
+    await getSupabase()
       .from('vods')
       .update({ order: i + 1 })
       .eq('id', orderedIds[i]);
@@ -96,7 +101,7 @@ export async function updateVodOrder(orderedIds: number[]): Promise<VodItem[]> {
 }
 
 export async function toggleVodEmbed(id: number, enabled: boolean): Promise<void> {
-  const { error } = await supabase
+  const { error } = await getSupabase()
     .from('vods')
     .update({ embed_enabled: enabled })
     .eq('id', id);
@@ -105,7 +110,7 @@ export async function toggleVodEmbed(id: number, enabled: boolean): Promise<void
 
 // ─── 예외 유저 CRUD ──────────────────────────────────────────────────────────
 export async function getAllowedUsers(): Promise<AllowedUser[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('allowed_users')
     .select('*')
     .order('created_at', { ascending: false });
@@ -118,7 +123,7 @@ export async function addAllowedUser(
   name: string,
   phoneNum: string
 ): Promise<AllowedUser> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('allowed_users')
     .insert({ name, phone_num: phoneNum })
     .select()
@@ -129,7 +134,7 @@ export async function addAllowedUser(
 }
 
 export async function deleteAllowedUser(id: number): Promise<void> {
-  const { error } = await supabase.from('allowed_users').delete().eq('id', id);
+  const { error } = await getSupabase().from('allowed_users').delete().eq('id', id);
   if (error) throw error;
 }
 
@@ -137,7 +142,7 @@ export async function isAllowedUser(
   name: string,
   phoneNum: string
 ): Promise<boolean> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('allowed_users')
     .select('id')
     .eq('name', name)
@@ -157,7 +162,7 @@ export async function checkRateLimit(
   const windowStart = new Date(Date.now() - windowSeconds * 1000).toISOString();
 
   // 윈도우 내 요청 수 조회
-  const { count, error } = await supabase
+  const { count, error } = await getSupabase()
     .from('rate_limits')
     .select('*', { count: 'exact', head: true })
     .eq('key', key)
@@ -170,11 +175,11 @@ export async function checkRateLimit(
 
   if (allowed) {
     // 요청 기록 삽입
-    await supabase.from('rate_limits').insert({ key });
+    await getSupabase().from('rate_limits').insert({ key });
   }
 
   // 만료된 레코드 정리 (비동기, 실패해도 무시)
-  supabase
+  getSupabase()
     .from('rate_limits')
     .delete()
     .lt('created_at', windowStart)
