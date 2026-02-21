@@ -64,11 +64,14 @@ export default function AdminVodPage() {
   const [addTitle, setAddTitle] = useState('');
   const [addUrl, setAddUrl] = useState('');
   const [addDesc, setAddDesc] = useState('');
+  const [addPublishedAt, setAddPublishedAt] = useState('');
   const [addLoading, setAddLoading] = useState(false);
   const [addError, setAddError] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<VodItem | null>(null);
   const [editingDescId, setEditingDescId] = useState<number | null>(null);
   const [editingDescText, setEditingDescText] = useState('');
+  const [editingPublishedAtId, setEditingPublishedAtId] = useState<number | null>(null);
+  const [editingPublishedAtText, setEditingPublishedAtText] = useState('');
 
   // ─── 예외 유저 상태 ───────────────────────────────────────────────
   const [users, setUsers] = useState<AllowedUser[]>([]);
@@ -130,12 +133,13 @@ export default function AdminVodPage() {
       const res = await fetch('/api/admin/vod', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: addTitle, youtubeUrl: addUrl, description: addDesc }),
+        body: JSON.stringify({ title: addTitle, youtubeUrl: addUrl, description: addDesc, publishedAt: addPublishedAt || null }),
       });
       if (res.ok) {
         setAddTitle('');
         setAddUrl('');
         setAddDesc('');
+        setAddPublishedAt('');
         await fetchVodList();
       } else {
         const data = await res.json();
@@ -208,6 +212,20 @@ export default function AdminVodPage() {
       await fetchVodList();
     } catch {
       setError('설명 저장에 실패했습니다.');
+    }
+  }
+
+  async function handleSavePublishedAt(id: number) {
+    try {
+      await fetch('/api/admin/vod', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, publishedAt: editingPublishedAtText || null }),
+      });
+      setEditingPublishedAtId(null);
+      await fetchVodList();
+    } catch {
+      setError('제작일 저장에 실패했습니다.');
     }
   }
 
@@ -370,6 +388,16 @@ export default function AdminVodPage() {
                 rows={2}
                 className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
               />
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600 shrink-0">제작일</label>
+                <Input
+                  type="date"
+                  value={addPublishedAt}
+                  onChange={(e) => setAddPublishedAt(e.target.value)}
+                  disabled={addLoading}
+                  className="flex-1"
+                />
+              </div>
               {addError && (
                 <Alert variant="destructive">
                   <AlertDescription>{addError}</AlertDescription>
@@ -426,6 +454,35 @@ export default function AdminVodPage() {
                           <span className="text-xs bg-gray-300 text-gray-700 px-1.5 py-0.5 rounded shrink-0">비공개</span>
                         )}
                       </div>
+                      {/* 제작일 영역 */}
+                      {editingPublishedAtId === vod.id ? (
+                        <div className="mt-0.5 flex gap-1.5 items-center">
+                          <input
+                            type="date"
+                            value={editingPublishedAtText}
+                            onChange={(e) => setEditingPublishedAtText(e.target.value)}
+                            className="rounded border border-gray-300 px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-900"
+                            autoFocus
+                          />
+                          <button
+                            className="text-xs px-2 py-1 rounded bg-gray-900 text-white hover:bg-gray-800 shrink-0"
+                            onClick={() => handleSavePublishedAt(vod.id)}
+                          >저장</button>
+                          <button
+                            className="text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 shrink-0"
+                            onClick={() => setEditingPublishedAtId(null)}
+                          >취소</button>
+                        </div>
+                      ) : (
+                        <p
+                          className="text-xs text-gray-400 mt-0.5 cursor-pointer hover:text-gray-600"
+                          onClick={() => { setEditingPublishedAtId(vod.id); setEditingPublishedAtText(vod.publishedAt ?? ''); }}
+                          title="클릭하여 제작일 수정"
+                        >
+                          {vod.publishedAt ? `제작일: ${vod.publishedAt}` : '제작일 추가...'}
+                        </p>
+                      )}
+
                       {/* 설명 영역 */}
                       {editingDescId === vod.id ? (
                         <div className="mt-1 flex gap-1.5 items-start">

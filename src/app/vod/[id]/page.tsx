@@ -65,6 +65,9 @@ export default function VodPlayerPage() {
             <VideoPlayer youtubeId={vod.youtubeId} />
             <div>
               <p className="text-sm font-medium text-gray-800">{vod.title}</p>
+              {vod.publishedAt && (
+                <p className="text-xs text-gray-400 mt-0.5">{vod.publishedAt}</p>
+              )}
               {vod.description && (
                 <p className="text-sm text-gray-500 mt-1 whitespace-pre-line">{vod.description}</p>
               )}

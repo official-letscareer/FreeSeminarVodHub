@@ -13,6 +13,7 @@ function toVodItem(row: Record<string, unknown>): VodItem {
     title: row.title as string,
     youtubeId: row.youtube_id as string,
     description: (row.description as string) ?? '',
+    publishedAt: (row.published_at as string) ?? null,
     order: row.order as number,
     embedEnabled: row.embed_enabled as boolean,
     createdAt: row.created_at as string,
@@ -51,7 +52,7 @@ export async function getEnabledVodList(): Promise<VodItem[]> {
 }
 
 export async function addVod(
-  data: Pick<VodItem, 'title' | 'youtubeId' | 'description'>
+  data: Pick<VodItem, 'title' | 'youtubeId' | 'description' | 'publishedAt'>
 ): Promise<VodItem> {
   const { data: maxRow } = await getSupabase()
     .from('vods')
@@ -68,6 +69,7 @@ export async function addVod(
       title: data.title,
       youtube_id: data.youtubeId,
       description: data.description,
+      published_at: data.publishedAt ?? null,
       order: nextOrder,
       embed_enabled: true,
     })
@@ -83,6 +85,20 @@ export async function updateVodDescription(id: number, description: string): Pro
     .from('vods')
     .update({ description })
     .eq('id', id);
+  if (error) throw error;
+}
+
+export async function updateVodMeta(
+  id: number,
+  meta: { title?: string; description?: string; publishedAt?: string | null }
+): Promise<void> {
+  const updates: Record<string, unknown> = {};
+  if (meta.title !== undefined) updates.title = meta.title;
+  if (meta.description !== undefined) updates.description = meta.description;
+  if ('publishedAt' in meta) updates.published_at = meta.publishedAt ?? null;
+
+  if (Object.keys(updates).length === 0) return;
+  const { error } = await getSupabase().from('vods').update(updates).eq('id', id);
   if (error) throw error;
 }
 

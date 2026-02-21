@@ -4,10 +4,14 @@ CREATE TABLE vods (
   title TEXT NOT NULL,
   youtube_id TEXT NOT NULL,
   description TEXT NOT NULL DEFAULT '',
+  published_at DATE,
   "order" INT NOT NULL DEFAULT 0,
   embed_enabled BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- 기존 테이블에 컬럼 추가 시 (마이그레이션용)
+-- ALTER TABLE vods ADD COLUMN IF NOT EXISTS published_at DATE;
 
 -- 예외 접근 유저 테이블
 CREATE TABLE allowed_users (

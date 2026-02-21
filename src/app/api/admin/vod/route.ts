@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getVodList, addVod, deleteVod, toggleVodEmbed, updateVodDescription } from '@/lib/kv';
+import { getVodList, addVod, deleteVod, toggleVodEmbed, updateVodMeta } from '@/lib/kv';
 import { parseYoutubeId } from '@/lib/youtube';
 
 function isAdminAuthorized(request: NextRequest): boolean {
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: '잘못된 요청입니다.' }, { status: 400 });
   }
 
-  const { title, youtubeUrl, description } = body as Record<string, unknown>;
+  const { title, youtubeUrl, description, publishedAt } = body as Record<string, unknown>;
 
   if (typeof title !== 'string' || title.trim().length === 0) {
     return NextResponse.json({ message: '제목을 입력해주세요.' }, { status: 400 });
@@ -41,7 +41,8 @@ export async function POST(request: NextRequest) {
   }
 
   const desc = typeof description === 'string' ? description.trim() : '';
-  const newVod = await addVod({ title: title.trim(), youtubeId, description: desc });
+  const pubAt = typeof publishedAt === 'string' && publishedAt.trim() ? publishedAt.trim() : null;
+  const newVod = await addVod({ title: title.trim(), youtubeId, description: desc, publishedAt: pubAt });
   return NextResponse.json(newVod, { status: 201 });
 }
 
@@ -79,7 +80,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ message: '잘못된 요청입니다.' }, { status: 400 });
   }
 
-  const { id, embedEnabled, description } = body as Record<string, unknown>;
+  const { id, embedEnabled, description, title, publishedAt } = body as Record<string, unknown>;
 
   if (typeof id !== 'number') {
     return NextResponse.json({ message: 'id(number)가 필요합니다.' }, { status: 400 });
@@ -88,8 +89,15 @@ export async function PATCH(request: NextRequest) {
   if (typeof embedEnabled === 'boolean') {
     await toggleVodEmbed(id, embedEnabled);
   }
-  if (typeof description === 'string') {
-    await updateVodDescription(id, description.trim());
+
+  const metaUpdate: { title?: string; description?: string; publishedAt?: string | null } = {};
+  if (typeof title === 'string') metaUpdate.title = title.trim();
+  if (typeof description === 'string') metaUpdate.description = description.trim();
+  if ('publishedAt' in (body as object)) {
+    metaUpdate.publishedAt = typeof publishedAt === 'string' && publishedAt.trim() ? publishedAt.trim() : null;
+  }
+  if (Object.keys(metaUpdate).length > 0) {
+    await updateVodMeta(id, metaUpdate);
   }
 
   return NextResponse.json({ success: true });

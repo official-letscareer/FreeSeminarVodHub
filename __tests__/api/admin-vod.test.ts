@@ -4,13 +4,13 @@ import { POST as adminAuthPost, DELETE as adminAuthDelete } from '@/app/api/admi
 import { GET as vodGet, POST as vodPost, DELETE as vodDelete, PATCH as vodPatch } from '@/app/api/admin/vod/route';
 import { PATCH as vodOrderPatch } from '@/app/api/admin/vod/order/route';
 import { NextRequest } from 'next/server';
-import { getVodList, addVod, deleteVod, toggleVodEmbed, updateVodDescription, updateVodOrder } from '@/lib/kv';
+import { getVodList, addVod, deleteVod, toggleVodEmbed, updateVodMeta, updateVodOrder } from '@/lib/kv';
 
 const mockGetVodList = getVodList as jest.MockedFunction<typeof getVodList>;
 const mockAddVod = addVod as jest.MockedFunction<typeof addVod>;
 const mockDeleteVod = deleteVod as jest.MockedFunction<typeof deleteVod>;
 const mockToggleVodEmbed = toggleVodEmbed as jest.MockedFunction<typeof toggleVodEmbed>;
-const mockUpdateVodDescription = updateVodDescription as jest.MockedFunction<typeof updateVodDescription>;
+const mockUpdateVodMeta = updateVodMeta as jest.MockedFunction<typeof updateVodMeta>;
 const mockUpdateVodOrder = updateVodOrder as jest.MockedFunction<typeof updateVodOrder>;
 
 function makeAdminReq(method: string, url: string, body?: unknown): NextRequest {
@@ -224,21 +224,21 @@ describe('PATCH /api/admin/vod (description update)', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('설명 수정 성공', async () => {
-    mockUpdateVodDescription.mockResolvedValue();
+    mockUpdateVodMeta.mockResolvedValue();
     const res = await vodPatch(makeAdminReq('PATCH', 'http://localhost/api/admin/vod', {
       id: 1, description: '새로운 설명',
     }));
     expect(res.status).toBe(200);
-    expect(mockUpdateVodDescription).toHaveBeenCalledWith(1, '새로운 설명');
+    expect(mockUpdateVodMeta).toHaveBeenCalledWith(1, { description: '새로운 설명' });
   });
 
   it('설명 앞뒤 공백 제거', async () => {
-    mockUpdateVodDescription.mockResolvedValue();
+    mockUpdateVodMeta.mockResolvedValue();
     const res = await vodPatch(makeAdminReq('PATCH', 'http://localhost/api/admin/vod', {
       id: 1, description: '  공백 포함 설명  ',
     }));
     expect(res.status).toBe(200);
-    expect(mockUpdateVodDescription).toHaveBeenCalledWith(1, '공백 포함 설명');
+    expect(mockUpdateVodMeta).toHaveBeenCalledWith(1, { description: '공백 포함 설명' });
   });
 });
 

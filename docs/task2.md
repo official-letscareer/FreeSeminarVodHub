@@ -86,43 +86,27 @@
 
 ---
 
-- [ ] **3.0 영상 메타정보 관리 (제목/설명/제작일)** (Push 단위)
+- [x] **3.0 영상 메타정보 관리 (제목/설명/제작일)** (Push 단위)
 
-    - [ ] 3.1 DB 스키마에 제작일(publishedAt) 컬럼 추가 (커밋 단위)
-        - `supabase-schema.sql` 수정
-            - `vods` 테이블에 `published_at DATE` 컬럼 추가
-        - `src/lib/types.ts` 수정
-            - `VodItem`에 `publishedAt: string | null` 필드 추가
-        - `src/lib/kv.ts` 수정
-            - `addVod()`, `getVodList()`, `getEnabledVodList()` — `publishedAt` 처리 추가
-        - [ ] 3.1.1 빌드 및 타입 체크 확인
-        - [ ] 3.1.2 오류 수정 (필요 시)
+    - [x] 3.1 DB 스키마에 제작일(publishedAt) 컬럼 추가 (커밋 단위)
+        - `supabase-schema.sql` 수정 — `published_at DATE` 컬럼 추가
+        - `src/lib/types.ts` 수정 — `publishedAt: string | null` 필드 추가
+        - `src/lib/kv.ts` 수정 — `toVodItem`, `addVod`, `updateVodMeta` 수정
+        - [x] 3.1.1 빌드 및 타입 체크 확인
 
-    - [ ] 3.2 어드민 메타정보 입력/수정 UI (커밋 단위)
-        - `src/app/api/admin/vod/route.ts` 수정
-            - `POST` (추가 시) — `publishedAt` 필드 수신 및 저장
-            - `PATCH` (수정 시) — `publishedAt` 업데이트 지원
-        - `src/lib/kv.ts` 수정
-            - `addVod()` 파라미터에 `publishedAt` 추가
-            - `updateVodMeta(id, { title, description, publishedAt })` 함수 추가
-        - `src/app/admin/vod/page.tsx` 수정
-            - VOD 추가 폼에 "제작일" 날짜 입력 필드 추가
-            - VOD 목록에서 제목/설명/제작일 인라인 수정 기능 추가
-        - [ ] 3.2.1 테스트 코드 작성 (`__tests__/api/admin-vod.test.ts`)
-        - [ ] 3.2.2 테스트 실행 및 검증
-        - [ ] 3.2.3 오류 수정 (필요 시)
+    - [x] 3.2 어드민 메타정보 입력/수정 UI (커밋 단위)
+        - `src/app/api/admin/vod/route.ts` 수정 — POST/PATCH에 publishedAt 처리
+        - `src/app/admin/vod/page.tsx` 수정 — 추가 폼 제작일 필드, 인라인 수정
+        - [x] 3.2.1 테스트 코드 수정 (`__tests__/api/admin-vod.test.ts`)
+        - [x] 3.2.2 테스트 실행 및 검증
 
-    - [ ] 3.3 프론트 VOD 목록에 제작일 표시 (커밋 단위)
-        - `src/components/vod-card.tsx` 수정
-            - 썸네일 카드에 제작일 표시 (publishedAt)
-        - [ ] 3.3.1 UI 렌더링 확인
-        - [ ] 3.3.2 오류 수정 (필요 시)
+    - [x] 3.3 프론트 VOD 목록에 제작일 표시 (커밋 단위)
+        - `src/components/vod-card.tsx` 수정 — publishedAt 표시
+        - [x] 3.3.1 UI 렌더링 확인
 
-    - [ ] 3.4 프론트 VOD 재생 화면에 설명 표시 (커밋 단위)
-        - `src/app/vod/[id]/page.tsx` 수정
-            - 제목 하단에 `description` 텍스트 표시
-        - [ ] 3.4.1 UI 렌더링 확인
-        - [ ] 3.4.2 오류 수정 (필요 시)
+    - [x] 3.4 프론트 VOD 재생 화면에 제작일/설명 표시 (커밋 단위)
+        - `src/app/vod/[id]/page.tsx` 수정 — publishedAt + description 표시
+        - [x] 3.4.1 UI 렌더링 확인
 
 ---
 
