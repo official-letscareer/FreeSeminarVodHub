@@ -130,6 +130,7 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       sameSite: 'lax',
       path: '/',
+      maxAge: 60 * 60 * 24 * 365, // 1년 (챌린지 기간 동안 유지)
     });
   }
   return response;

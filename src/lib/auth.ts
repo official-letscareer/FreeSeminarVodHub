@@ -19,7 +19,7 @@ export async function verifyChallenge(
 
 export function getSession(): AuthSession | null {
   if (typeof window === 'undefined') return null;
-  const raw = sessionStorage.getItem(SESSION_KEY);
+  const raw = localStorage.getItem(SESSION_KEY);
   if (!raw) return null;
   try {
     return JSON.parse(raw) as AuthSession;
@@ -34,22 +34,22 @@ export function setSession(data: Omit<AuthSession, 'isVerified' | 'verifiedAt'>)
     isVerified: true,
     verifiedAt: new Date().toISOString(),
   };
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
 export function clearSession(): void {
-  sessionStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(SESSION_KEY);
 }
 
 export function getAdminSession(): boolean {
   if (typeof window === 'undefined') return false;
-  return sessionStorage.getItem(ADMIN_SESSION_KEY) === 'true';
+  return localStorage.getItem(ADMIN_SESSION_KEY) === 'true';
 }
 
 export function setAdminSession(): void {
-  sessionStorage.setItem(ADMIN_SESSION_KEY, 'true');
+  localStorage.setItem(ADMIN_SESSION_KEY, 'true');
 }
 
 export function clearAdminSession(): void {
-  sessionStorage.removeItem(ADMIN_SESSION_KEY);
+  localStorage.removeItem(ADMIN_SESSION_KEY);
 }

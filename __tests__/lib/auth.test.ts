@@ -1,6 +1,6 @@
 import { verifyChallenge, getSession, setSession, clearSession, getAdminSession, setAdminSession, clearAdminSession } from '@/lib/auth';
 
-const mockSessionStorage = (() => {
+const mockLocalStorage = (() => {
   let store: Record<string, string> = {};
   return {
     getItem: jest.fn((key: string) => store[key] ?? null),
@@ -10,7 +10,7 @@ const mockSessionStorage = (() => {
   };
 })();
 
-Object.defineProperty(global, 'sessionStorage', { value: mockSessionStorage });
+Object.defineProperty(global, 'localStorage', { value: mockLocalStorage });
 Object.defineProperty(global, 'window', { value: global });
 
 global.fetch = jest.fn();
@@ -18,7 +18,7 @@ global.fetch = jest.fn();
 describe('auth utils', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockSessionStorage.clear();
+    mockLocalStorage.clear();
   });
 
   describe('verifyChallenge', () => {
@@ -79,7 +79,7 @@ describe('auth utils', () => {
     });
 
     it('sessionStorage에 잘못된 JSON이 있을 때 null 반환', () => {
-      mockSessionStorage.getItem.mockReturnValueOnce('invalid-json');
+      mockLocalStorage.getItem.mockReturnValueOnce('invalid-json');
       expect(getSession()).toBeNull();
     });
   });
