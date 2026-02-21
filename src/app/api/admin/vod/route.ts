@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getVodList, addVod, deleteVod, toggleVodEmbed } from '@/lib/kv';
+import { getVodList, addVod, deleteVod, toggleVodEmbed, updateVodDescription } from '@/lib/kv';
 import { parseYoutubeId } from '@/lib/youtube';
 
 function isAdminAuthorized(request: NextRequest): boolean {
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: '잘못된 요청입니다.' }, { status: 400 });
   }
 
-  const { title, youtubeUrl } = body as Record<string, unknown>;
+  const { title, youtubeUrl, description } = body as Record<string, unknown>;
 
   if (typeof title !== 'string' || title.trim().length === 0) {
     return NextResponse.json({ message: '제목을 입력해주세요.' }, { status: 400 });
@@ -40,7 +40,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: '유효하지 않은 유튜브 URL입니다.' }, { status: 400 });
   }
 
-  const newVod = await addVod({ title: title.trim(), youtubeId });
+  const desc = typeof description === 'string' ? description.trim() : '';
+  const newVod = await addVod({ title: title.trim(), youtubeId, description: desc });
   return NextResponse.json(newVod, { status: 201 });
 }
 
@@ -78,12 +79,18 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ message: '잘못된 요청입니다.' }, { status: 400 });
   }
 
-  const { id, embedEnabled } = body as Record<string, unknown>;
+  const { id, embedEnabled, description } = body as Record<string, unknown>;
 
-  if (typeof id !== 'number' || typeof embedEnabled !== 'boolean') {
-    return NextResponse.json({ message: 'id(number)와 embedEnabled(boolean)가 필요합니다.' }, { status: 400 });
+  if (typeof id !== 'number') {
+    return NextResponse.json({ message: 'id(number)가 필요합니다.' }, { status: 400 });
   }
 
-  await toggleVodEmbed(id, embedEnabled);
+  if (typeof embedEnabled === 'boolean') {
+    await toggleVodEmbed(id, embedEnabled);
+  }
+  if (typeof description === 'string') {
+    await updateVodDescription(id, description.trim());
+  }
+
   return NextResponse.json({ success: true });
 }

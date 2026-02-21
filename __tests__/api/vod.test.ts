@@ -19,8 +19,8 @@ function makeUnauthReq(url: string): NextRequest {
 }
 
 const mockList = [
-  { id: 1, title: 'A', youtubeId: 'aaa', order: 1, embedEnabled: true, createdAt: '2024-01-01' },
-  { id: 2, title: 'B', youtubeId: 'bbb', order: 2, embedEnabled: true, createdAt: '2024-01-02' },
+  { id: 1, title: 'A', youtubeId: 'aaa', description: '설명A', order: 1, embedEnabled: true, createdAt: '2024-01-01' },
+  { id: 2, title: 'B', youtubeId: 'bbb', description: '', order: 2, embedEnabled: true, createdAt: '2024-01-02' },
 ];
 
 describe('GET /api/vod', () => {

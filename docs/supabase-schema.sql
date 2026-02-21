@@ -3,6 +3,7 @@ CREATE TABLE vods (
   id BIGSERIAL PRIMARY KEY,
   title TEXT NOT NULL,
   youtube_id TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
   "order" INT NOT NULL DEFAULT 0,
   embed_enabled BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

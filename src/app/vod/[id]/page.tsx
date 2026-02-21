@@ -61,9 +61,14 @@ export default function VodPlayerPage() {
         ) : error ? (
           <p className="text-center text-sm text-red-500 mt-12">{error}</p>
         ) : vod ? (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <VideoPlayer youtubeId={vod.youtubeId} />
-            <p className="text-sm font-medium text-gray-800">{vod.title}</p>
+            <div>
+              <p className="text-sm font-medium text-gray-800">{vod.title}</p>
+              {vod.description && (
+                <p className="text-sm text-gray-500 mt-1 whitespace-pre-line">{vod.description}</p>
+              )}
+            </div>
           </div>
         ) : null}
       </main>

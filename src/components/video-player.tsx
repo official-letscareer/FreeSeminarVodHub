@@ -173,9 +173,10 @@ export default function VideoPlayer({ youtubeId }: { youtubeId: string }) {
         {/* YT 플레이어가 마운트될 div */}
         <div ref={divRef} className="absolute inset-0 w-full h-full" />
 
-        {/* 투명 오버레이: iframe 직접 클릭 차단 (z-10) */}
+        {/* 투명 오버레이: iframe 직접 클릭 차단 + 클릭으로 재생/일시정지 (z-10) */}
         <div
-          className="absolute inset-0 z-10"
+          className="absolute inset-0 z-10 cursor-pointer"
+          onClick={handlePlayPause}
           onContextMenu={(e) => e.preventDefault()}
         />
 

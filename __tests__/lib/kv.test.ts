@@ -12,6 +12,7 @@ import {
   deleteVod,
   updateVodOrder,
   toggleVodEmbed,
+  updateVodDescription,
   getAllowedUsers,
   addAllowedUser,
   deleteAllowedUser,
@@ -45,8 +46,8 @@ describe('kv (Supabase)', () => {
   describe('getVodList', () => {
     it('VOD 목록 반환', async () => {
       const rows = [
-        { id: 1, title: 'A', youtube_id: 'aaa', order: 1, embed_enabled: true, created_at: '2024-01-01' },
-        { id: 2, title: 'B', youtube_id: 'bbb', order: 2, embed_enabled: false, created_at: '2024-01-02' },
+        { id: 1, title: 'A', youtube_id: 'aaa', description: '설명A', order: 1, embed_enabled: true, created_at: '2024-01-01' },
+        { id: 2, title: 'B', youtube_id: 'bbb', description: '', order: 2, embed_enabled: false, created_at: '2024-01-02' },
       ];
       mockFrom.mockReturnValue(createChain({ data: rows }));
 
@@ -54,7 +55,9 @@ describe('kv (Supabase)', () => {
       expect(result).toHaveLength(2);
       expect(result[0].id).toBe(1);
       expect(result[0].youtubeId).toBe('aaa');
+      expect(result[0].description).toBe('설명A');
       expect(result[1].embedEnabled).toBe(false);
+      expect(result[1].description).toBe('');
       expect(mockFrom).toHaveBeenCalledWith('vods');
     });
 
@@ -73,7 +76,7 @@ describe('kv (Supabase)', () => {
   describe('getEnabledVodList', () => {
     it('embed_enabled: true인 VOD만 반환', async () => {
       const rows = [
-        { id: 1, title: 'A', youtube_id: 'aaa', order: 1, embed_enabled: true, created_at: '2024-01-01' },
+        { id: 1, title: 'A', youtube_id: 'aaa', description: '', order: 1, embed_enabled: true, created_at: '2024-01-01' },
       ];
       const chain = createChain({ data: rows });
       mockFrom.mockReturnValue(chain);
@@ -88,24 +91,25 @@ describe('kv (Supabase)', () => {
     it('새 VOD 추가 (기존 VOD 있을 때)', async () => {
       const maxOrderChain = createChain({ data: { order: 3 } });
       const insertChain = createChain({
-        data: { id: 4, title: 'New', youtube_id: 'xyz', order: 4, embed_enabled: true, created_at: '2024-01-01' },
+        data: { id: 4, title: 'New', youtube_id: 'xyz', description: '새 설명', order: 4, embed_enabled: true, created_at: '2024-01-01' },
       });
       mockFrom.mockReturnValueOnce(maxOrderChain).mockReturnValueOnce(insertChain);
 
-      const result = await addVod({ title: 'New', youtubeId: 'xyz' });
+      const result = await addVod({ title: 'New', youtubeId: 'xyz', description: '새 설명' });
       expect(result.id).toBe(4);
       expect(result.title).toBe('New');
+      expect(result.description).toBe('새 설명');
       expect(result.order).toBe(4);
     });
 
     it('첫 VOD 추가 (기존 없을 때)', async () => {
       const maxOrderChain = createChain({ data: null });
       const insertChain = createChain({
-        data: { id: 1, title: 'First', youtube_id: 'abc', order: 1, embed_enabled: true, created_at: '2024-01-01' },
+        data: { id: 1, title: 'First', youtube_id: 'abc', description: '', order: 1, embed_enabled: true, created_at: '2024-01-01' },
       });
       mockFrom.mockReturnValueOnce(maxOrderChain).mockReturnValueOnce(insertChain);
 
-      const result = await addVod({ title: 'First', youtubeId: 'abc' });
+      const result = await addVod({ title: 'First', youtubeId: 'abc', description: '' });
       expect(result.order).toBe(1);
     });
   });
@@ -117,8 +121,8 @@ describe('kv (Supabase)', () => {
       // 2) getVodList (after delete)
       const listChain = createChain({
         data: [
-          { id: 1, title: 'A', youtube_id: 'a', order: 1, embed_enabled: true, created_at: '' },
-          { id: 3, title: 'C', youtube_id: 'c', order: 3, embed_enabled: true, created_at: '' },
+          { id: 1, title: 'A', youtube_id: 'a', description: '', order: 1, embed_enabled: true, created_at: '' },
+          { id: 3, title: 'C', youtube_id: 'c', description: '', order: 3, embed_enabled: true, created_at: '' },
         ],
       });
       // 3+) reorder updates
@@ -133,6 +137,22 @@ describe('kv (Supabase)', () => {
 
       await deleteVod(2);
       expect(mockFrom).toHaveBeenCalledWith('vods');
+    });
+  });
+
+  describe('updateVodDescription', () => {
+    it('설명 업데이트', async () => {
+      const chain = createChain({ data: null });
+      mockFrom.mockReturnValue(chain);
+
+      await updateVodDescription(1, '새로운 설명');
+      expect((chain.update as jest.Mock)).toHaveBeenCalledWith({ description: '새로운 설명' });
+      expect((chain.eq as jest.Mock)).toHaveBeenCalledWith('id', 1);
+    });
+
+    it('Supabase 에러 시 throw', async () => {
+      mockFrom.mockReturnValue(createChain({ error: { message: 'update error' } }));
+      await expect(updateVodDescription(1, 'test')).rejects.toEqual({ message: 'update error' });
     });
   });
 
@@ -154,8 +174,8 @@ describe('kv (Supabase)', () => {
       const update2 = createChain({ data: null });
       const listChain = createChain({
         data: [
-          { id: 2, title: 'B', youtube_id: 'b', order: 1, embed_enabled: true, created_at: '' },
-          { id: 1, title: 'A', youtube_id: 'a', order: 2, embed_enabled: true, created_at: '' },
+          { id: 2, title: 'B', youtube_id: 'b', description: '', order: 1, embed_enabled: true, created_at: '' },
+          { id: 1, title: 'A', youtube_id: 'a', description: '', order: 2, embed_enabled: true, created_at: '' },
         ],
       });
 

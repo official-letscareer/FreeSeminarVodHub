@@ -25,9 +25,12 @@ export default function AdminVodPage() {
   const [error, setError] = useState('');
   const [addTitle, setAddTitle] = useState('');
   const [addUrl, setAddUrl] = useState('');
+  const [addDesc, setAddDesc] = useState('');
   const [addLoading, setAddLoading] = useState(false);
   const [addError, setAddError] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<VodItem | null>(null);
+  const [editingDescId, setEditingDescId] = useState<number | null>(null);
+  const [editingDescText, setEditingDescText] = useState('');
 
   // ─── 예외 유저 상태 ───────────────────────────────────────────────
   const [users, setUsers] = useState<AllowedUser[]>([]);
@@ -83,11 +86,12 @@ export default function AdminVodPage() {
       const res = await fetch('/api/admin/vod', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: addTitle, youtubeUrl: addUrl }),
+        body: JSON.stringify({ title: addTitle, youtubeUrl: addUrl, description: addDesc }),
       });
       if (res.ok) {
         setAddTitle('');
         setAddUrl('');
+        setAddDesc('');
         await fetchVodList();
       } else {
         const data = await res.json();
@@ -147,6 +151,20 @@ export default function AdminVodPage() {
       body: JSON.stringify({ orderedIds }),
     });
     await fetchVodList();
+  }
+
+  async function handleSaveDescription(id: number) {
+    try {
+      await fetch('/api/admin/vod', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, description: editingDescText }),
+      });
+      setEditingDescId(null);
+      await fetchVodList();
+    } catch {
+      setError('설명 저장에 실패했습니다.');
+    }
   }
 
   // ─── 예외 유저 핸들러 ─────────────────────────────────────────────
@@ -225,6 +243,14 @@ export default function AdminVodPage() {
                 disabled={addLoading}
                 required
               />
+              <textarea
+                placeholder="설명 (선택사항)"
+                value={addDesc}
+                onChange={(e) => setAddDesc(e.target.value)}
+                disabled={addLoading}
+                rows={2}
+                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
+              />
               {addError && (
                 <Alert variant="destructive">
                   <AlertDescription>{addError}</AlertDescription>
@@ -250,7 +276,34 @@ export default function AdminVodPage() {
             ) : (
               <ul className="space-y-2">
                 {vodList.map((vod, index) => (
-                  <li key={vod.id} className={`flex items-center gap-2 p-3 rounded border ${vod.embedEnabled ? 'bg-white' : 'bg-gray-100 opacity-60'}`}>
+                  <li key={vod.id} className={`flex items-center gap-3 p-3 rounded-lg border ${vod.embedEnabled ? 'bg-white' : 'bg-gray-100 opacity-60'}`}>
+                    {/* 순서 이동 버튼 */}
+                    <div className="flex flex-col gap-0.5 shrink-0">
+                      <button
+                        className="w-7 h-7 flex items-center justify-center rounded-md border border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        onClick={() => handleMoveUp(index)}
+                        disabled={index === 0}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+                      </button>
+                      <button
+                        className="w-7 h-7 flex items-center justify-center rounded-md border border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        onClick={() => handleMoveDown(index)}
+                        disabled={index === vodList.length - 1}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                      </button>
+                    </div>
+
+                    {/* 순서 번호 */}
+                    <span className="text-xs font-mono text-gray-400 w-5 text-center shrink-0">{index + 1}</span>
+
+                    {/* 썸네일 + 정보 */}
+                    <img
+                      src={`https://img.youtube.com/vi/${vod.youtubeId}/default.jpg`}
+                      alt={vod.title}
+                      className="w-20 h-12 object-cover rounded shrink-0"
+                    />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="font-medium text-sm truncate">{vod.title}</p>
@@ -258,16 +311,38 @@ export default function AdminVodPage() {
                           <span className="text-xs bg-gray-300 text-gray-700 px-1.5 py-0.5 rounded shrink-0">비공개</span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <img
-                          src={`https://img.youtube.com/vi/${vod.youtubeId}/default.jpg`}
-                          alt={vod.title}
-                          className="w-16 h-10 object-cover rounded"
-                        />
-                        <p className="text-xs text-gray-500">{vod.youtubeId}</p>
-                      </div>
+                      {/* 설명 영역 */}
+                      {editingDescId === vod.id ? (
+                        <div className="mt-1 flex gap-1.5 items-start">
+                          <textarea
+                            value={editingDescText}
+                            onChange={(e) => setEditingDescText(e.target.value)}
+                            rows={2}
+                            className="flex-1 rounded border border-gray-300 px-2 py-1 text-xs resize-none focus:outline-none focus:ring-1 focus:ring-gray-900"
+                            autoFocus
+                          />
+                          <button
+                            className="text-xs px-2 py-1 rounded bg-gray-900 text-white hover:bg-gray-800 shrink-0"
+                            onClick={() => handleSaveDescription(vod.id)}
+                          >저장</button>
+                          <button
+                            className="text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 shrink-0"
+                            onClick={() => setEditingDescId(null)}
+                          >취소</button>
+                        </div>
+                      ) : (
+                        <p
+                          className="text-xs text-gray-400 mt-0.5 cursor-pointer hover:text-gray-600 truncate"
+                          onClick={() => { setEditingDescId(vod.id); setEditingDescText(vod.description); }}
+                          title="클릭하여 설명 수정"
+                        >
+                          {vod.description || '설명 추가...'}
+                        </p>
+                      )}
                     </div>
-                    <div className="flex gap-1 shrink-0 flex-wrap justify-end">
+
+                    {/* 액션 버튼 */}
+                    <div className="flex gap-1.5 shrink-0">
                       <Button
                         variant={vod.embedEnabled ? 'outline' : 'default'}
                         size="sm"
@@ -275,18 +350,6 @@ export default function AdminVodPage() {
                       >
                         {vod.embedEnabled ? '숨기기' : '공개'}
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleMoveUp(index)}
-                        disabled={index === 0}
-                      >↑</Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleMoveDown(index)}
-                        disabled={index === vodList.length - 1}
-                      >↓</Button>
                       <Button
                         variant="destructive"
                         size="sm"

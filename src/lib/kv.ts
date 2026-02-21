@@ -12,6 +12,7 @@ function toVodItem(row: Record<string, unknown>): VodItem {
     id: row.id as number,
     title: row.title as string,
     youtubeId: row.youtube_id as string,
+    description: (row.description as string) ?? '',
     order: row.order as number,
     embedEnabled: row.embed_enabled as boolean,
     createdAt: row.created_at as string,
@@ -50,7 +51,7 @@ export async function getEnabledVodList(): Promise<VodItem[]> {
 }
 
 export async function addVod(
-  data: Pick<VodItem, 'title' | 'youtubeId'>
+  data: Pick<VodItem, 'title' | 'youtubeId' | 'description'>
 ): Promise<VodItem> {
   const { data: maxRow } = await getSupabase()
     .from('vods')
@@ -66,6 +67,7 @@ export async function addVod(
     .insert({
       title: data.title,
       youtube_id: data.youtubeId,
+      description: data.description,
       order: nextOrder,
       embed_enabled: true,
     })
@@ -74,6 +76,14 @@ export async function addVod(
 
   if (error) throw error;
   return toVodItem(inserted);
+}
+
+export async function updateVodDescription(id: number, description: string): Promise<void> {
+  const { error } = await getSupabase()
+    .from('vods')
+    .update({ description })
+    .eq('id', id);
+  if (error) throw error;
 }
 
 export async function deleteVod(id: number): Promise<void> {

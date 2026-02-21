@@ -2,6 +2,7 @@ export interface VodItem {
   id: number;
   title: string;
   youtubeId: string;
+  description: string;
   order: number;
   embedEnabled: boolean;
   createdAt: string;
