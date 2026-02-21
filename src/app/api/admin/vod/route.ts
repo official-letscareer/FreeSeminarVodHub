@@ -1,13 +1,62 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { getVodList, addVod, deleteVod } from '@/lib/kv';
+import { parseYoutubeId } from '@/lib/youtube';
 
-export async function GET() {
-  return NextResponse.json({ message: 'Not implemented' }, { status: 501 });
+function isAdminAuthorized(request: NextRequest): boolean {
+  return request.cookies.get('admin_verified')?.value === '1';
 }
 
-export async function POST() {
-  return NextResponse.json({ message: 'Not implemented' }, { status: 501 });
+export async function GET(request: NextRequest) {
+  if (!isAdminAuthorized(request)) {
+    return NextResponse.json({ message: '인증이 필요합니다.' }, { status: 401 });
+  }
+  const list = await getVodList();
+  return NextResponse.json(list);
 }
 
-export async function DELETE() {
-  return NextResponse.json({ message: 'Not implemented' }, { status: 501 });
+export async function POST(request: NextRequest) {
+  if (!isAdminAuthorized(request)) {
+    return NextResponse.json({ message: '인증이 필요합니다.' }, { status: 401 });
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ message: '잘못된 요청입니다.' }, { status: 400 });
+  }
+
+  const { title, youtubeUrl } = body as Record<string, unknown>;
+
+  if (typeof title !== 'string' || title.trim().length === 0) {
+    return NextResponse.json({ message: '제목을 입력해주세요.' }, { status: 400 });
+  }
+  if (typeof youtubeUrl !== 'string') {
+    return NextResponse.json({ message: '유튜브 URL을 입력해주세요.' }, { status: 400 });
+  }
+
+  const youtubeId = parseYoutubeId(youtubeUrl.trim());
+  if (!youtubeId) {
+    return NextResponse.json({ message: '유효하지 않은 유튜브 URL입니다.' }, { status: 400 });
+  }
+
+  const newVod = await addVod({ title: title.trim(), youtubeId });
+  return NextResponse.json(newVod, { status: 201 });
+}
+
+export async function DELETE(request: NextRequest) {
+  if (!isAdminAuthorized(request)) {
+    return NextResponse.json({ message: '인증이 필요합니다.' }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const idParam = searchParams.get('id');
+  const id = idParam ? parseInt(idParam, 10) : NaN;
+
+  if (isNaN(id)) {
+    return NextResponse.json({ message: 'VOD ID가 필요합니다.' }, { status: 400 });
+  }
+
+  await deleteVod(id);
+  return NextResponse.json({ success: true });
 }

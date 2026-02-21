@@ -160,7 +160,7 @@
         - [x] 3.1.2 테스트 실행 및 검증
         - [x] 3.1.3 오류 수정 (필요 시)
 
-    - [ ] 3.2 관리자 VOD CRUD API 구현 (커밋 단위)
+    - [x] 3.2 관리자 VOD CRUD API 구현 (커밋 단위)
         - `src/app/api/admin/vod/route.ts`
             - `GET` — Vercel KV에서 VOD 목록 조회
             - `POST` — VOD 추가 (제목 + 유튜브 URL → youtubeId 파싱 후 KV 저장)
@@ -168,9 +168,9 @@
         - `src/app/api/admin/vod/order/route.ts`
             - `PATCH` — VOD 순서 변경 (order 값 업데이트)
         - 모든 엔드포인트에 관리자 세션 검증
-        - [ ] 3.2.1 테스트 코드 작성 (`__tests__/api/admin-vod.test.ts`에 추가)
-        - [ ] 3.2.2 테스트 실행 및 검증
-        - [ ] 3.2.3 오류 수정 (필요 시)
+        - [x] 3.2.1 테스트 코드 작성 (`__tests__/api/admin-vod.test.ts`에 추가)
+        - [x] 3.2.2 테스트 실행 및 검증
+        - [x] 3.2.3 오류 수정 (필요 시)
 
     - [ ] 3.3 관리자 로그인 페이지 UI (커밋 단위)
         - `src/app/admin/page.tsx`
