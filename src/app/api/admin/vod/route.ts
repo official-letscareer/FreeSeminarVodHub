@@ -57,8 +57,13 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ message: 'VOD ID가 필요합니다.' }, { status: 400 });
   }
 
-  await deleteVod(id);
-  return NextResponse.json({ success: true });
+  try {
+    await deleteVod(id);
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error('deleteVod error:', err);
+    return NextResponse.json({ message: 'VOD 삭제에 실패했습니다.' }, { status: 500 });
+  }
 }
 
 export async function PATCH(request: NextRequest) {
