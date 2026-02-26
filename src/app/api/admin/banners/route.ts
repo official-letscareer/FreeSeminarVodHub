@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBanners, addBanner, deleteBanner, updateBannerOrder } from '@/lib/kv';
+import { getBanners, addBanner, deleteBanner, updateBannerOrder, updateBannerMeta } from '@/lib/kv';
 import { supabase } from '@/lib/supabase';
 import { Banner } from '@/lib/types';
 
@@ -95,9 +95,21 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ message: '잘못된 요청입니다.' }, { status: 400 });
   }
 
-  const { orderedIds } = body as Record<string, unknown>;
+  const { orderedIds, id, linkUrl } = body as Record<string, unknown>;
+
+  // 개별 배너 메타 수정
+  if (typeof id === 'number') {
+    const meta: { linkUrl?: string } = {};
+    if (typeof linkUrl === 'string') meta.linkUrl = linkUrl;
+    if (Object.keys(meta).length > 0) {
+      await updateBannerMeta(id, meta);
+    }
+    return NextResponse.json({ success: true });
+  }
+
+  // 순서 변경
   if (!Array.isArray(orderedIds)) {
-    return NextResponse.json({ message: 'orderedIds(array)가 필요합니다.' }, { status: 400 });
+    return NextResponse.json({ message: 'orderedIds(array) 또는 id(number)가 필요합니다.' }, { status: 400 });
   }
 
   await updateBannerOrder(orderedIds as number[]);
