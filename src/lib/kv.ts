@@ -276,6 +276,18 @@ export async function deleteBanner(id: number): Promise<void> {
   }
 }
 
+export async function updateBannerMeta(
+  id: number,
+  meta: { linkUrl?: string }
+): Promise<void> {
+  const updates: Record<string, unknown> = {};
+  if (meta.linkUrl !== undefined) updates.link_url = meta.linkUrl;
+
+  if (Object.keys(updates).length === 0) return;
+  const { error } = await getSupabase().from('banners').update(updates).eq('id', id);
+  if (error) throw error;
+}
+
 export async function updateBannerOrder(orderedIds: number[]): Promise<void> {
   for (let i = 0; i < orderedIds.length; i++) {
     await getSupabase()

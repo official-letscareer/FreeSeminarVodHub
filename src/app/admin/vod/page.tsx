@@ -77,10 +77,10 @@ export default function AdminVodPage() {
   const [deleteTarget, setDeleteTarget] = useState<VodItem | null>(null);
   const [editingDescId, setEditingDescId] = useState<number | null>(null);
   const [editingDescText, setEditingDescText] = useState('');
-  const [editingPublishedAtId, setEditingPublishedAtId] = useState<number | null>(null);
-  const [editingPublishedAtText, setEditingPublishedAtText] = useState('');
   const [editingTitleId, setEditingTitleId] = useState<number | null>(null);
   const [editingTitleText, setEditingTitleText] = useState('');
+  const [editingPublishedAtId, setEditingPublishedAtId] = useState<number | null>(null);
+  const [editingPublishedAtText, setEditingPublishedAtText] = useState('');
 
   // ─── 예외 유저 상태 ───────────────────────────────────────────────
   const [users, setUsers] = useState<AllowedUser[]>([]);
@@ -107,6 +107,8 @@ export default function AdminVodPage() {
   const [bannerIsRandom, setBannerIsRandom] = useState(false);
   const [bannerAddLoading, setBannerAddLoading] = useState(false);
   const [bannerError, setBannerError] = useState('');
+  const [editingBannerLinkId, setEditingBannerLinkId] = useState<number | null>(null);
+  const [editingBannerLinkText, setEditingBannerLinkText] = useState('');
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const [editingBannerId, setEditingBannerId] = useState<number | null>(null);
   const [editingBannerLinkUrl, setEditingBannerLinkUrl] = useState('');
@@ -442,6 +444,20 @@ export default function AdminVodPage() {
     } finally {
       setBannerAddLoading(false);
       if (bannerInputRef.current) bannerInputRef.current.value = '';
+    }
+  }
+
+  async function handleSaveBannerLink(id: number) {
+    try {
+      await fetch('/api/admin/banners', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, linkUrl: editingBannerLinkText }),
+      });
+      setEditingBannerLinkId(null);
+      await fetchBanners();
+    } catch {
+      setBannerError('배너 링크 저장에 실패했습니다.');
     }
   }
 
