@@ -77,6 +77,8 @@ export default function AdminVodPage() {
   const [deleteTarget, setDeleteTarget] = useState<VodItem | null>(null);
   const [editingDescId, setEditingDescId] = useState<number | null>(null);
   const [editingDescText, setEditingDescText] = useState('');
+  const [editingTitleId, setEditingTitleId] = useState<number | null>(null);
+  const [editingTitleText, setEditingTitleText] = useState('');
   const [editingPublishedAtId, setEditingPublishedAtId] = useState<number | null>(null);
   const [editingPublishedAtText, setEditingPublishedAtText] = useState('');
 
@@ -102,6 +104,8 @@ export default function AdminVodPage() {
   const [bannerIsRandom, setBannerIsRandom] = useState(false);
   const [bannerAddLoading, setBannerAddLoading] = useState(false);
   const [bannerError, setBannerError] = useState('');
+  const [editingBannerLinkId, setEditingBannerLinkId] = useState<number | null>(null);
+  const [editingBannerLinkText, setEditingBannerLinkText] = useState('');
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
   // ─── VOD 데이터 로드 ──────────────────────────────────────────────
@@ -230,6 +234,21 @@ export default function AdminVodPage() {
       body: JSON.stringify({ orderedIds }),
     });
     await fetchVodList();
+  }
+
+  async function handleSaveTitle(id: number) {
+    if (!editingTitleText.trim()) return;
+    try {
+      await fetch('/api/admin/vod', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, title: editingTitleText }),
+      });
+      setEditingTitleId(null);
+      await fetchVodList();
+    } catch {
+      setError('제목 저장에 실패했습니다.');
+    }
   }
 
   async function handleSaveDescription(id: number) {
@@ -400,6 +419,20 @@ export default function AdminVodPage() {
     }
   }
 
+  async function handleSaveBannerLink(id: number) {
+    try {
+      await fetch('/api/admin/banners', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, linkUrl: editingBannerLinkText }),
+      });
+      setEditingBannerLinkId(null);
+      await fetchBanners();
+    } catch {
+      setBannerError('배너 링크 저장에 실패했습니다.');
+    }
+  }
+
   async function handleDeleteBanner(id: number) {
     try {
       await fetch(`/api/admin/banners?id=${id}`, { method: 'DELETE' });
@@ -545,7 +578,35 @@ export default function AdminVodPage() {
                     <AdminThumbnail youtubeId={vod.youtubeId} title={vod.title} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="font-medium text-sm truncate">{vod.title}</p>
+                        {editingTitleId === vod.id ? (
+                          <div className="flex gap-1.5 items-center flex-1 min-w-0">
+                            <input
+                              type="text"
+                              value={editingTitleText}
+                              onChange={(e) => setEditingTitleText(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveTitle(vod.id);
+                                if (e.key === 'Escape') setEditingTitleId(null);
+                              }}
+                              className="flex-1 min-w-0 rounded border border-gray-300 px-2 py-0.5 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-gray-900"
+                              autoFocus
+                            />
+                            <button
+                              className="text-xs px-2 py-1 rounded bg-gray-900 text-white hover:bg-gray-800 shrink-0"
+                              onClick={() => handleSaveTitle(vod.id)}
+                            >저장</button>
+                            <button
+                              className="text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 shrink-0"
+                              onClick={() => setEditingTitleId(null)}
+                            >취소</button>
+                          </div>
+                        ) : (
+                          <p
+                            className="font-medium text-sm truncate cursor-pointer hover:text-blue-600"
+                            onClick={() => { setEditingTitleId(vod.id); setEditingTitleText(vod.title); }}
+                            title="클릭하여 제목 수정"
+                          >{vod.title}</p>
+                        )}
                         {!vod.embedEnabled && (
                           <span className="text-xs bg-gray-300 text-gray-700 px-1.5 py-0.5 rounded shrink-0">비공개</span>
                         )}
@@ -730,7 +791,36 @@ export default function AdminVodPage() {
                     />
                     {/* 정보 */}
                     <div className="flex-1 min-w-0 text-xs text-gray-500 space-y-0.5">
-                      <p className="truncate">{banner.linkUrl || '링크 없음'}</p>
+                      {editingBannerLinkId === banner.id ? (
+                        <div className="flex gap-1.5 items-center">
+                          <input
+                            type="text"
+                            value={editingBannerLinkText}
+                            onChange={(e) => setEditingBannerLinkText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveBannerLink(banner.id);
+                              if (e.key === 'Escape') setEditingBannerLinkId(null);
+                            }}
+                            placeholder="https://..."
+                            className="flex-1 min-w-0 rounded border border-gray-300 px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-900"
+                            autoFocus
+                          />
+                          <button
+                            className="text-xs px-2 py-1 rounded bg-gray-900 text-white hover:bg-gray-800 shrink-0"
+                            onClick={() => handleSaveBannerLink(banner.id)}
+                          >저장</button>
+                          <button
+                            className="text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 shrink-0"
+                            onClick={() => setEditingBannerLinkId(null)}
+                          >취소</button>
+                        </div>
+                      ) : (
+                        <p
+                          className="truncate cursor-pointer hover:text-blue-600"
+                          onClick={() => { setEditingBannerLinkId(banner.id); setEditingBannerLinkText(banner.linkUrl); }}
+                          title="클릭하여 링크 수정"
+                        >{banner.linkUrl || '링크 추가...'}</p>
+                      )}
                       <p>
                         {banner.position === 'list' ? '목록 상단' : banner.position === 'player' ? '재생화면 하단' : '둘 다'}
                         {banner.isRandom && ' · 랜덤'}
