@@ -170,6 +170,18 @@ export async function deleteAllowedUsers(ids: number[]): Promise<void> {
   if (error) throw error;
 }
 
+export async function updateAllowedUser(
+  id: number,
+  data: { name?: string; phoneNum?: string }
+): Promise<void> {
+  const updates: Record<string, unknown> = {};
+  if (data.name !== undefined) updates.name = data.name;
+  if (data.phoneNum !== undefined) updates.phone_num = data.phoneNum;
+  if (Object.keys(updates).length === 0) return;
+  const { error } = await getSupabase().from('allowed_users').update(updates).eq('id', id);
+  if (error) throw error;
+}
+
 export async function isAllowedUser(
   name: string,
   phoneNum: string
@@ -271,6 +283,20 @@ export async function updateBannerOrder(orderedIds: number[]): Promise<void> {
       .update({ order: i + 1 })
       .eq('id', orderedIds[i]);
   }
+}
+
+export async function updateBannerMeta(
+  id: number,
+  meta: { linkUrl?: string; position?: Banner['position']; isRandom?: boolean }
+): Promise<void> {
+  const updates: Record<string, unknown> = {};
+  if (meta.linkUrl !== undefined) updates.link_url = meta.linkUrl;
+  if (meta.position !== undefined) updates.position = meta.position;
+  if (meta.isRandom !== undefined) updates.is_random = meta.isRandom;
+
+  if (Object.keys(updates).length === 0) return;
+  const { error } = await getSupabase().from('banners').update(updates).eq('id', id);
+  if (error) throw error;
 }
 
 // ─── Rate Limiting ───────────────────────────────────────────────────────────

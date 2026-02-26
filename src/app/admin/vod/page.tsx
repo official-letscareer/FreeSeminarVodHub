@@ -79,6 +79,8 @@ export default function AdminVodPage() {
   const [editingDescText, setEditingDescText] = useState('');
   const [editingPublishedAtId, setEditingPublishedAtId] = useState<number | null>(null);
   const [editingPublishedAtText, setEditingPublishedAtText] = useState('');
+  const [editingTitleId, setEditingTitleId] = useState<number | null>(null);
+  const [editingTitleText, setEditingTitleText] = useState('');
 
   // ─── 예외 유저 상태 ───────────────────────────────────────────────
   const [users, setUsers] = useState<AllowedUser[]>([]);
@@ -93,6 +95,9 @@ export default function AdminVodPage() {
   const [csvUploadLoading, setCsvUploadLoading] = useState(false);
   const [csvResult, setCsvResult] = useState<{ added: number; skipped: number; errors: string[] } | null>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
+  const [editingUserId, setEditingUserId] = useState<number | null>(null);
+  const [editingUserName, setEditingUserName] = useState('');
+  const [editingUserPhone, setEditingUserPhone] = useState('');
 
   // ─── 배너 상태 ────────────────────────────────────────────────────
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -103,6 +108,10 @@ export default function AdminVodPage() {
   const [bannerAddLoading, setBannerAddLoading] = useState(false);
   const [bannerError, setBannerError] = useState('');
   const bannerInputRef = useRef<HTMLInputElement>(null);
+  const [editingBannerId, setEditingBannerId] = useState<number | null>(null);
+  const [editingBannerLinkUrl, setEditingBannerLinkUrl] = useState('');
+  const [editingBannerPosition, setEditingBannerPosition] = useState<Banner['position']>('both');
+  const [editingBannerIsRandom, setEditingBannerIsRandom] = useState(false);
 
   // ─── VOD 데이터 로드 ──────────────────────────────────────────────
   const fetchVodList = useCallback(async () => {
@@ -232,6 +241,21 @@ export default function AdminVodPage() {
     await fetchVodList();
   }
 
+  async function handleSaveTitle(id: number) {
+    if (!editingTitleText.trim()) return;
+    try {
+      await fetch('/api/admin/vod', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, title: editingTitleText }),
+      });
+      setEditingTitleId(null);
+      await fetchVodList();
+    } catch {
+      setError('제목 저장에 실패했습니다.');
+    }
+  }
+
   async function handleSaveDescription(id: number) {
     try {
       await fetch('/api/admin/vod', {
@@ -293,6 +317,27 @@ export default function AdminVodPage() {
       await fetchUsers();
     } catch {
       setUserError('삭제에 실패했습니다.');
+    }
+  }
+
+  async function handleSaveUser(id: number) {
+    if (!editingUserName.trim()) return;
+    const digits = editingUserPhone.replace(/\D/g, '').slice(0, 11);
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, name: editingUserName, phoneNum: digits }),
+      });
+      if (res.ok) {
+        setEditingUserId(null);
+        await fetchUsers();
+      } else {
+        const data = await res.json();
+        setUserError(data.message || '저장에 실패했습니다.');
+      }
+    } catch {
+      setUserError('서버 연결에 실패했습니다.');
     }
   }
 
@@ -421,6 +466,32 @@ export default function AdminVodPage() {
     await fetchBanners();
   }
 
+  function startEditingBanner(banner: Banner) {
+    setEditingBannerId(banner.id);
+    setEditingBannerLinkUrl(banner.linkUrl);
+    setEditingBannerPosition(banner.position);
+    setEditingBannerIsRandom(banner.isRandom);
+  }
+
+  async function handleSaveBanner(id: number) {
+    try {
+      await fetch('/api/admin/banners', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          linkUrl: editingBannerLinkUrl,
+          position: editingBannerPosition,
+          isRandom: editingBannerIsRandom,
+        }),
+      });
+      setEditingBannerId(null);
+      await fetchBanners();
+    } catch {
+      setBannerError('배너 저장에 실패했습니다.');
+    }
+  }
+
   async function handleBannerMoveDown(index: number) {
     if (index === banners.length - 1) return;
     const newList = [...banners];
@@ -544,12 +615,37 @@ export default function AdminVodPage() {
                     {/* 썸네일 + 정보 */}
                     <AdminThumbnail youtubeId={vod.youtubeId} title={vod.title} />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-sm truncate">{vod.title}</p>
-                        {!vod.embedEnabled && (
-                          <span className="text-xs bg-gray-300 text-gray-700 px-1.5 py-0.5 rounded shrink-0">비공개</span>
-                        )}
-                      </div>
+                      {/* 제목 영역 */}
+                      {editingTitleId === vod.id ? (
+                        <div className="flex gap-1.5 items-center mb-0.5">
+                          <input
+                            value={editingTitleText}
+                            onChange={(e) => setEditingTitleText(e.target.value)}
+                            className="flex-1 rounded border border-gray-300 px-2 py-0.5 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-gray-900 min-w-0"
+                            autoFocus
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleSaveTitle(vod.id); if (e.key === 'Escape') setEditingTitleId(null); }}
+                          />
+                          <button
+                            className="text-xs px-2 py-1 rounded bg-gray-900 text-white hover:bg-gray-800 shrink-0"
+                            onClick={() => handleSaveTitle(vod.id)}
+                          >저장</button>
+                          <button
+                            className="text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 shrink-0"
+                            onClick={() => setEditingTitleId(null)}
+                          >취소</button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <p
+                            className="font-medium text-sm truncate cursor-pointer hover:text-blue-600"
+                            onClick={() => { setEditingTitleId(vod.id); setEditingTitleText(vod.title); }}
+                            title="클릭하여 제목 수정"
+                          >{vod.title}</p>
+                          {!vod.embedEnabled && (
+                            <span className="text-xs bg-gray-300 text-gray-700 px-1.5 py-0.5 rounded shrink-0">비공개</span>
+                          )}
+                        </div>
+                      )}
                       {/* 제작일 영역 */}
                       {editingPublishedAtId === vod.id ? (
                         <div className="mt-0.5 flex gap-1.5 items-center">
@@ -729,13 +825,57 @@ export default function AdminVodPage() {
                       className="h-10 w-28 object-cover rounded shrink-0"
                     />
                     {/* 정보 */}
-                    <div className="flex-1 min-w-0 text-xs text-gray-500 space-y-0.5">
-                      <p className="truncate">{banner.linkUrl || '링크 없음'}</p>
-                      <p>
-                        {banner.position === 'list' ? '목록 상단' : banner.position === 'player' ? '재생화면 하단' : '둘 다'}
-                        {banner.isRandom && ' · 랜덤'}
-                      </p>
-                    </div>
+                    {editingBannerId === banner.id ? (
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        <input
+                          placeholder="링크 URL (선택사항)"
+                          value={editingBannerLinkUrl}
+                          onChange={(e) => setEditingBannerLinkUrl(e.target.value)}
+                          className="w-full rounded border border-gray-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-gray-900"
+                          autoFocus
+                        />
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <select
+                            value={editingBannerPosition}
+                            onChange={(e) => setEditingBannerPosition(e.target.value as Banner['position'])}
+                            className="rounded border border-gray-300 px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-gray-900"
+                          >
+                            <option value="both">목록 + 재생화면</option>
+                            <option value="list">목록 상단만</option>
+                            <option value="player">재생화면 하단만</option>
+                          </select>
+                          <label className="flex items-center gap-1 text-xs text-gray-600 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={editingBannerIsRandom}
+                              onChange={(e) => setEditingBannerIsRandom(e.target.checked)}
+                              className="rounded"
+                            />
+                            랜덤
+                          </label>
+                          <button
+                            className="text-xs px-2 py-1 rounded bg-gray-900 text-white hover:bg-gray-800 shrink-0"
+                            onClick={() => handleSaveBanner(banner.id)}
+                          >저장</button>
+                          <button
+                            className="text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 shrink-0"
+                            onClick={() => setEditingBannerId(null)}
+                          >취소</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        className="flex-1 min-w-0 text-xs text-gray-500 space-y-0.5 cursor-pointer hover:text-gray-700"
+                        onClick={() => startEditingBanner(banner)}
+                        title="클릭하여 배너 정보 수정"
+                      >
+                        <p className="truncate">{banner.linkUrl || '링크 없음'}</p>
+                        <p>
+                          {banner.position === 'list' ? '목록 상단' : banner.position === 'player' ? '재생화면 하단' : '둘 다'}
+                          {banner.isRandom && ' · 랜덤'}
+                        </p>
+                      </div>
+                    )}
                     <Button
                       variant="destructive"
                       size="sm"
@@ -892,21 +1032,67 @@ export default function AdminVodPage() {
                               className="rounded"
                             />
                           </td>
-                          <td className="p-2 font-medium">{user.name}</td>
-                          <td className="p-2 text-gray-600">{user.phoneNum}</td>
-                          <td className="p-2 text-gray-400 text-xs">
-                            {new Date(user.createdAt).toLocaleDateString('ko-KR')}
-                          </td>
-                          <td className="p-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setDeleteUserTarget(user)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50 h-7 px-2"
-                            >
-                              삭제
-                            </Button>
-                          </td>
+                          {editingUserId === user.id ? (
+                            <>
+                              <td className="p-1">
+                                <input
+                                  value={editingUserName}
+                                  onChange={(e) => setEditingUserName(e.target.value)}
+                                  className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
+                                  autoFocus
+                                />
+                              </td>
+                              <td className="p-1">
+                                <input
+                                  value={editingUserPhone}
+                                  onChange={(e) => setEditingUserPhone(formatPhoneNum(e.target.value))}
+                                  placeholder="01012345678"
+                                  className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
+                                />
+                              </td>
+                              <td className="p-2 text-gray-400 text-xs">
+                                {new Date(user.createdAt).toLocaleDateString('ko-KR')}
+                              </td>
+                              <td className="p-1">
+                                <div className="flex gap-1">
+                                  <button
+                                    className="text-xs px-2 py-1 rounded bg-gray-900 text-white hover:bg-gray-800"
+                                    onClick={() => handleSaveUser(user.id)}
+                                  >저장</button>
+                                  <button
+                                    className="text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
+                                    onClick={() => setEditingUserId(null)}
+                                  >취소</button>
+                                </div>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td
+                                className="p-2 font-medium cursor-pointer hover:text-blue-600"
+                                onClick={() => { setEditingUserId(user.id); setEditingUserName(user.name); setEditingUserPhone(user.phoneNum); }}
+                                title="클릭하여 수정"
+                              >{user.name}</td>
+                              <td
+                                className="p-2 text-gray-600 cursor-pointer hover:text-blue-600"
+                                onClick={() => { setEditingUserId(user.id); setEditingUserName(user.name); setEditingUserPhone(user.phoneNum); }}
+                                title="클릭하여 수정"
+                              >{user.phoneNum}</td>
+                              <td className="p-2 text-gray-400 text-xs">
+                                {new Date(user.createdAt).toLocaleDateString('ko-KR')}
+                              </td>
+                              <td className="p-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setDeleteUserTarget(user)}
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50 h-7 px-2"
+                                >
+                                  삭제
+                                </Button>
+                              </td>
+                            </>
+                          )}
                         </tr>
                       ))}
                     </tbody>

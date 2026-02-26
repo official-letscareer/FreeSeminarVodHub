@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBanners, addBanner, deleteBanner, updateBannerOrder } from '@/lib/kv';
+import { getBanners, addBanner, deleteBanner, updateBannerOrder, updateBannerMeta } from '@/lib/kv';
 import { supabase } from '@/lib/supabase';
 import { Banner } from '@/lib/types';
 
@@ -95,11 +95,26 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ message: '잘못된 요청입니다.' }, { status: 400 });
   }
 
-  const { orderedIds } = body as Record<string, unknown>;
-  if (!Array.isArray(orderedIds)) {
-    return NextResponse.json({ message: 'orderedIds(array)가 필요합니다.' }, { status: 400 });
+  const { orderedIds, id, linkUrl, position, isRandom } = body as Record<string, unknown>;
+
+  // 순서 변경
+  if (Array.isArray(orderedIds)) {
+    await updateBannerOrder(orderedIds as number[]);
+    return NextResponse.json({ success: true });
   }
 
-  await updateBannerOrder(orderedIds as number[]);
+  // 배너 정보 수정
+  if (typeof id !== 'number') {
+    return NextResponse.json({ message: 'orderedIds(array) 또는 id(number)가 필요합니다.' }, { status: 400 });
+  }
+
+  const meta: { linkUrl?: string; position?: Banner['position']; isRandom?: boolean } = {};
+  if (typeof linkUrl === 'string') meta.linkUrl = linkUrl.trim();
+  if (typeof position === 'string' && ['list', 'player', 'both'].includes(position)) {
+    meta.position = position as Banner['position'];
+  }
+  if (typeof isRandom === 'boolean') meta.isRandom = isRandom;
+
+  await updateBannerMeta(id, meta);
   return NextResponse.json({ success: true });
 }
