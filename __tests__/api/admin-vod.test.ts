@@ -170,6 +170,18 @@ describe('POST /api/admin/vod', () => {
     }));
     expect(res.status).toBe(201);
   });
+
+  it('라이브 스트리밍 URL 지원', async () => {
+    mockAddVod.mockResolvedValue({
+      id: 5, title: 'Live', youtubeId: 'dQw4w9WgXcQ', description: '', order: 5, embedEnabled: true, createdAt: '2024-01-01',
+    });
+    const res = await vodPost(makeAdminReq('POST', 'http://localhost/api/admin/vod', {
+      title: 'Live', youtubeUrl: 'https://www.youtube.com/live/dQw4w9WgXcQ?si=abc123',
+    }));
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.youtubeId).toBe('dQw4w9WgXcQ');
+  });
 });
 
 describe('DELETE /api/admin/vod', () => {
