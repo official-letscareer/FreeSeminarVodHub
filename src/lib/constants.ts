@@ -8,6 +8,7 @@ export const RATE_LIMIT = {
 
 export const ROUTES = {
   LOGIN: '/login',
+  MEMBERSHIP: '/membership',
   VOD: '/vod',
   ADMIN: '/admin',
   ADMIN_VOD: '/admin/vod',
