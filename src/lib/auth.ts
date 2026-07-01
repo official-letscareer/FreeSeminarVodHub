@@ -17,6 +17,20 @@ export async function verifyChallenge(
   return data.isChallenge === true;
 }
 
+export async function verifyMembership(
+  name: string,
+  phoneNum: string
+): Promise<boolean> {
+  const response = await fetch('/api/auth/verify-membership', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, phoneNum }),
+  });
+  if (!response.ok) return false;
+  const data = await response.json();
+  return data.isChallenge === true;
+}
+
 export function getSession(): AuthSession | null {
   if (typeof window === 'undefined') return null;
   const raw = localStorage.getItem(SESSION_KEY);
