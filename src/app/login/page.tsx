@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { verifyChallenge, setSession } from '@/lib/auth';
+import { navigateTo } from '@/lib/navigate';
 
 function formatPhoneNum(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 11);
@@ -21,8 +22,27 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    // useSearchParams()는 Suspense 경계가 필요한데 이 페이지는 이미 완전히
+    // 클라이언트 렌더링이라 굳이 경계를 새로 만들지 않고 window.location에서 읽는다.
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('error') === 'sso_failed') {
+      setError('렛츠커리어 로그인에 실패했습니다. 다시 시도해주세요.');
+    }
+  }, []);
+
   function handlePhoneChange(e: React.ChangeEvent<HTMLInputElement>) {
     setPhoneNum(formatPhoneNum(e.target.value));
+  }
+
+  function handleSsoLogin() {
+    const ssoUrl = process.env.NEXT_PUBLIC_LETSCAREER_SSO_URL;
+    if (!ssoUrl) {
+      setError('SSO 로그인이 아직 설정되지 않았습니다.');
+      return;
+    }
+    const redirectUri = `${window.location.origin}/auth/callback`;
+    navigateTo(`${ssoUrl}/sso/login?redirect_uri=${encodeURIComponent(redirectUri)}`);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -94,6 +114,25 @@ export default function LoginPage() {
             {loading ? '확인 중...' : '확인'}
           </Button>
         </form>
+
+        <div className="my-6 flex items-center gap-3">
+          <div className="h-px flex-1 bg-gray-200" />
+          <span className="text-xs text-gray-400">또는</span>
+          <div className="h-px flex-1 bg-gray-200" />
+        </div>
+
+        {/*
+          기존 이름+전화번호 폼은 그대로 둔다 — 렛커 계정이 없는 예외/프리미엄 유저는
+          이 폼으로만 들어올 수 있다(LC-3208 확정 사항 2·4). SSO는 선택지 추가일 뿐이다.
+        */}
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={handleSsoLogin}
+        >
+          렛츠커리어로 로그인
+        </Button>
       </div>
     </div>
   );
