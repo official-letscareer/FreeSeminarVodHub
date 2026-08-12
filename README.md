@@ -144,6 +144,9 @@ npm install
 # 렛츠커리어 API
 LETSCAREER_API_URL=
 
+# 렛츠커리어 SSO 로그인 페이지 (LC-3208, 브라우저에서 직접 리다이렉트하므로 NEXT_PUBLIC_ 접두사 필요)
+NEXT_PUBLIC_LETSCAREER_SSO_URL=
+
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
