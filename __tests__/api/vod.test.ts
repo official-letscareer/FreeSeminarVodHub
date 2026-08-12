@@ -1,16 +1,25 @@
 jest.mock('@/lib/kv');
+jest.mock('@/lib/sso');
 
 import { GET as vodListGet } from '@/app/api/vod/route';
 import { GET as vodDetailGet } from '@/app/api/vod/[id]/route';
 import { NextRequest } from 'next/server';
 import { getEnabledVodList, getVodList } from '@/lib/kv';
+import { getSsoUserProfile, SSO_ACCESS_TOKEN_COOKIE } from '@/lib/sso';
 
 const mockGetEnabledVodList = getEnabledVodList as jest.MockedFunction<typeof getEnabledVodList>;
 const mockGetVodList = getVodList as jest.MockedFunction<typeof getVodList>;
+const mockGetSsoUserProfile = getSsoUserProfile as jest.MockedFunction<typeof getSsoUserProfile>;
 
 function makeAuthReq(url: string): NextRequest {
   const req = new NextRequest(url);
   req.cookies.set('auth_verified', '1');
+  return req;
+}
+
+function makeSsoReq(url: string, token = 'access.jwt.value'): NextRequest {
+  const req = new NextRequest(url);
+  req.cookies.set(SSO_ACCESS_TOKEN_COOKIE, token);
   return req;
 }
 
@@ -45,6 +54,38 @@ describe('GET /api/vod', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual([]);
+  });
+
+  describe('SSO 토큰(LC-3208)', () => {
+    it('유효한 SSO 토큰이면 목록을 반환한다', async () => {
+      mockGetSsoUserProfile.mockResolvedValue({ name: '홍길동' });
+      mockGetEnabledVodList.mockResolvedValue(mockList);
+
+      const res = await vodListGet(makeSsoReq('http://localhost/api/vod'));
+
+      expect(res.status).toBe(200);
+      expect(mockGetSsoUserProfile).toHaveBeenCalledWith('access.jwt.value');
+    });
+
+    it('만료·위조된 SSO 토큰이면 401을 반환하고 쿠키를 지운다', async () => {
+      mockGetSsoUserProfile.mockResolvedValue(null);
+
+      const res = await vodListGet(makeSsoReq('http://localhost/api/vod'));
+
+      expect(res.status).toBe(401);
+      const setCookie = res.headers.get('set-cookie');
+      expect(setCookie).toContain(SSO_ACCESS_TOKEN_COOKIE);
+      expect(setCookie).toMatch(/Max-Age=0/i);
+    });
+
+    it('auth_verified 쿠키가 있으면 SSO 검증(네트워크 호출) 없이 바로 통과한다', async () => {
+      mockGetEnabledVodList.mockResolvedValue(mockList);
+
+      const res = await vodListGet(makeAuthReq('http://localhost/api/vod'));
+
+      expect(res.status).toBe(200);
+      expect(mockGetSsoUserProfile).not.toHaveBeenCalled();
+    });
   });
 });
 
