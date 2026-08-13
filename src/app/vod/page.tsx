@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import SiteHeader from '@/components/site-header';
 import VodCard from '@/components/vod-card';
 import VodListItem from '@/components/vod-list-item';
 import BannerCarousel from '@/components/banner-carousel';
@@ -21,7 +22,10 @@ export default function VodListPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
 
   useEffect(() => {
+    // localStorage는 서버 렌더 시점엔 없어서 lazy initializer로 옮길 수 없다 —
+    // 마운트 후 한 번만 읽어 하이드레이션 이후 값을 반영하는 의도적인 패턴이다.
     const saved = localStorage.getItem(STORAGE_KEY);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (saved === 'list' || saved === 'grid') setViewMode(saved);
   }, []);
 
@@ -54,14 +58,24 @@ export default function VodListPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-4 py-3 flex items-center justify-between">
-        <h1 className="text-lg font-bold text-gray-900">챌린지 VOD</h1>
-        <Button variant="ghost" size="sm" onClick={handleLogout}>
-          로그아웃
-        </Button>
-      </header>
+      <SiteHeader
+        left={
+          <h1 className="truncate text-lg font-bold text-gray-900">
+            세미나 VOD
+          </h1>
+        }
+        right={
+          <Button variant="ghost" size="sm" onClick={handleLogout}>
+            로그아웃
+          </Button>
+        }
+      />
 
-      <BannerCarousel position="list" />
+      {/* 헤더·본문과 같은 max-w-5xl 폭으로 맞춘다 — 예전엔 배너만 화면 끝까지
+          꽉 채워서 아래 영상 목록과 좌우 폭이 어긋나 보였다. */}
+      <div className="max-w-5xl mx-auto px-4 pt-4">
+        <BannerCarousel position="list" />
+      </div>
       <main className="max-w-5xl mx-auto px-4 py-6">
         {error && (
           <p className="text-center text-sm text-red-500 mb-4">{error}</p>
@@ -72,7 +86,7 @@ export default function VodListPage() {
             <button
               onClick={() => handleViewMode('grid')}
               title="썸네일뷰"
-              className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-gray-200 text-gray-900' : 'text-gray-400 hover:text-gray-700'}`}
+              className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-primary/10 text-primary' : 'text-gray-400 hover:text-gray-700'}`}
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M3 3h7v7H3V3zm0 11h7v7H3v-7zm11-11h7v7h-7V3zm0 11h7v7h-7v-7z" />
@@ -81,7 +95,7 @@ export default function VodListPage() {
             <button
               onClick={() => handleViewMode('list')}
               title="리스트뷰"
-              className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-gray-200 text-gray-900' : 'text-gray-400 hover:text-gray-700'}`}
+              className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-primary/10 text-primary' : 'text-gray-400 hover:text-gray-700'}`}
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M3 5h18v2H3V5zm0 6h18v2H3v-2zm0 6h18v2H3v-2z" />
@@ -93,7 +107,10 @@ export default function VodListPage() {
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="rounded-lg overflow-hidden border bg-white shadow-sm">
+              <div
+                key={i}
+                className="rounded-lg overflow-hidden border bg-white shadow-sm"
+              >
                 <Skeleton className="aspect-video w-full" />
                 <div className="p-3">
                   <Skeleton className="h-4 w-3/4" />

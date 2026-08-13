@@ -1,31 +1,70 @@
 jest.mock('@/lib/kv');
 
-import { POST as adminAuthPost, DELETE as adminAuthDelete } from '@/app/api/admin/auth/route';
-import { GET as vodGet, POST as vodPost, DELETE as vodDelete, PATCH as vodPatch } from '@/app/api/admin/vod/route';
+import {
+  POST as adminAuthPost,
+  DELETE as adminAuthDelete,
+} from '@/app/api/admin/auth/route';
+import {
+  GET as vodGet,
+  POST as vodPost,
+  DELETE as vodDelete,
+  PATCH as vodPatch,
+} from '@/app/api/admin/vod/route';
 import { PATCH as vodOrderPatch } from '@/app/api/admin/vod/order/route';
 import { NextRequest } from 'next/server';
-import { getVodList, addVod, deleteVod, toggleVodEmbed, updateVodMeta, updateVodOrder } from '@/lib/kv';
+import {
+  getVodList,
+  addVod,
+  deleteVod,
+  toggleVodEmbed,
+  updateVodMeta,
+  updateVodOrder,
+} from '@/lib/kv';
 
 const mockGetVodList = getVodList as jest.MockedFunction<typeof getVodList>;
 const mockAddVod = addVod as jest.MockedFunction<typeof addVod>;
 const mockDeleteVod = deleteVod as jest.MockedFunction<typeof deleteVod>;
-const mockToggleVodEmbed = toggleVodEmbed as jest.MockedFunction<typeof toggleVodEmbed>;
-const mockUpdateVodMeta = updateVodMeta as jest.MockedFunction<typeof updateVodMeta>;
-const mockUpdateVodOrder = updateVodOrder as jest.MockedFunction<typeof updateVodOrder>;
+const mockToggleVodEmbed = toggleVodEmbed as jest.MockedFunction<
+  typeof toggleVodEmbed
+>;
+const mockUpdateVodMeta = updateVodMeta as jest.MockedFunction<
+  typeof updateVodMeta
+>;
+const mockUpdateVodOrder = updateVodOrder as jest.MockedFunction<
+  typeof updateVodOrder
+>;
 
-function makeAdminReq(method: string, url: string, body?: unknown): NextRequest {
+function makeAdminReq(
+  method: string,
+  url: string,
+  body?: unknown,
+): NextRequest {
   const req = new NextRequest(url, {
     method,
-    ...(body ? { body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } } : {}),
+    ...(body
+      ? {
+          body: JSON.stringify(body),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      : {}),
   });
   req.cookies.set('admin_verified', '1');
   return req;
 }
 
-function makeUnauthReq(method: string, url: string, body?: unknown): NextRequest {
+function makeUnauthReq(
+  method: string,
+  url: string,
+  body?: unknown,
+): NextRequest {
   return new NextRequest(url, {
     method,
-    ...(body ? { body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } } : {}),
+    ...(body
+      ? {
+          body: JSON.stringify(body),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      : {}),
   });
 }
 
@@ -38,8 +77,26 @@ function makeRequest(body: unknown): NextRequest {
 }
 
 const mockVodList = [
-  { id: 1, title: 'A', youtubeId: 'aaa', description: '설명A', order: 1, embedEnabled: true, createdAt: '2024-01-01' },
-  { id: 2, title: 'B', youtubeId: 'bbb', description: '', order: 2, embedEnabled: false, createdAt: '2024-01-02' },
+  {
+    id: 1,
+    title: 'A',
+    youtubeId: 'aaa',
+    description: '설명A',
+    order: 1,
+    embedEnabled: true,
+    createdAt: '2024-01-01',
+    publishedAt: null,
+  },
+  {
+    id: 2,
+    title: 'B',
+    youtubeId: 'bbb',
+    description: '',
+    order: 2,
+    embedEnabled: false,
+    createdAt: '2024-01-02',
+    publishedAt: null,
+  },
 ];
 
 // ─── 관리자 인증 ─────────────────────────────────────────────────────
@@ -91,14 +148,18 @@ describe('POST /api/admin/auth', () => {
 
 describe('DELETE /api/admin/auth', () => {
   it('인증된 상태에서 로그아웃 → 200', async () => {
-    const req = new NextRequest('http://localhost/api/admin/auth', { method: 'DELETE' });
+    const req = new NextRequest('http://localhost/api/admin/auth', {
+      method: 'DELETE',
+    });
     req.cookies.set('admin_verified', '1');
     const res = await adminAuthDelete(req);
     expect(res.status).toBe(200);
   });
 
   it('미인증 상태에서 로그아웃 → 401', async () => {
-    const req = new NextRequest('http://localhost/api/admin/auth', { method: 'DELETE' });
+    const req = new NextRequest('http://localhost/api/admin/auth', {
+      method: 'DELETE',
+    });
     const res = await adminAuthDelete(req);
     expect(res.status).toBe(401);
   });
@@ -109,13 +170,17 @@ describe('GET /api/admin/vod', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('미인증 → 401', async () => {
-    const res = await vodGet(makeUnauthReq('GET', 'http://localhost/api/admin/vod'));
+    const res = await vodGet(
+      makeUnauthReq('GET', 'http://localhost/api/admin/vod'),
+    );
     expect(res.status).toBe(401);
   });
 
   it('인증 → VOD 목록 반환', async () => {
     mockGetVodList.mockResolvedValue(mockVodList);
-    const res = await vodGet(makeAdminReq('GET', 'http://localhost/api/admin/vod'));
+    const res = await vodGet(
+      makeAdminReq('GET', 'http://localhost/api/admin/vod'),
+    );
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveLength(2);
@@ -126,21 +191,33 @@ describe('POST /api/admin/vod', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('미인증 → 401', async () => {
-    const res = await vodPost(makeUnauthReq('POST', 'http://localhost/api/admin/vod', {
-      title: 'Test', youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-    }));
+    const res = await vodPost(
+      makeUnauthReq('POST', 'http://localhost/api/admin/vod', {
+        title: 'Test',
+        youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      }),
+    );
     expect(res.status).toBe(401);
   });
 
   it('유효한 유튜브 URL로 VOD 추가 → 201', async () => {
     mockAddVod.mockResolvedValue({
-      id: 3, title: '테스트', youtubeId: 'dQw4w9WgXcQ', description: '설명입니다', order: 3, embedEnabled: true, createdAt: '2024-01-01',
-    });
-    const res = await vodPost(makeAdminReq('POST', 'http://localhost/api/admin/vod', {
+      id: 3,
       title: '테스트',
-      youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      youtubeId: 'dQw4w9WgXcQ',
       description: '설명입니다',
-    }));
+      order: 3,
+      embedEnabled: true,
+      createdAt: '2024-01-01',
+      publishedAt: null,
+    });
+    const res = await vodPost(
+      makeAdminReq('POST', 'http://localhost/api/admin/vod', {
+        title: '테스트',
+        youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        description: '설명입니다',
+      }),
+    );
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.youtubeId).toBe('dQw4w9WgXcQ');
@@ -148,36 +225,62 @@ describe('POST /api/admin/vod', () => {
   });
 
   it('유효하지 않은 URL → 400', async () => {
-    const res = await vodPost(makeAdminReq('POST', 'http://localhost/api/admin/vod', {
-      title: '테스트', youtubeUrl: 'not-a-youtube-url',
-    }));
+    const res = await vodPost(
+      makeAdminReq('POST', 'http://localhost/api/admin/vod', {
+        title: '테스트',
+        youtubeUrl: 'not-a-youtube-url',
+      }),
+    );
     expect(res.status).toBe(400);
   });
 
   it('제목 누락 → 400', async () => {
-    const res = await vodPost(makeAdminReq('POST', 'http://localhost/api/admin/vod', {
-      title: '', youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-    }));
+    const res = await vodPost(
+      makeAdminReq('POST', 'http://localhost/api/admin/vod', {
+        title: '',
+        youtubeUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      }),
+    );
     expect(res.status).toBe(400);
   });
 
   it('youtu.be 단축 URL 지원', async () => {
     mockAddVod.mockResolvedValue({
-      id: 4, title: 'Short', youtubeId: 'dQw4w9WgXcQ', description: '', order: 4, embedEnabled: true, createdAt: '2024-01-01',
+      id: 4,
+      title: 'Short',
+      youtubeId: 'dQw4w9WgXcQ',
+      description: '',
+      order: 4,
+      embedEnabled: true,
+      createdAt: '2024-01-01',
+      publishedAt: null,
     });
-    const res = await vodPost(makeAdminReq('POST', 'http://localhost/api/admin/vod', {
-      title: 'Short', youtubeUrl: 'https://youtu.be/dQw4w9WgXcQ',
-    }));
+    const res = await vodPost(
+      makeAdminReq('POST', 'http://localhost/api/admin/vod', {
+        title: 'Short',
+        youtubeUrl: 'https://youtu.be/dQw4w9WgXcQ',
+      }),
+    );
     expect(res.status).toBe(201);
   });
 
   it('라이브 스트리밍 URL 지원', async () => {
     mockAddVod.mockResolvedValue({
-      id: 5, title: 'Live', youtubeId: 'dQw4w9WgXcQ', description: '', order: 5, embedEnabled: true, createdAt: '2024-01-01',
+      id: 5,
+      title: 'Live',
+      youtubeId: 'dQw4w9WgXcQ',
+      description: '',
+      order: 5,
+      embedEnabled: true,
+      createdAt: '2024-01-01',
+      publishedAt: null,
     });
-    const res = await vodPost(makeAdminReq('POST', 'http://localhost/api/admin/vod', {
-      title: 'Live', youtubeUrl: 'https://www.youtube.com/live/dQw4w9WgXcQ?si=abc123',
-    }));
+    const res = await vodPost(
+      makeAdminReq('POST', 'http://localhost/api/admin/vod', {
+        title: 'Live',
+        youtubeUrl: 'https://www.youtube.com/live/dQw4w9WgXcQ?si=abc123',
+      }),
+    );
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.youtubeId).toBe('dQw4w9WgXcQ');
@@ -188,19 +291,25 @@ describe('DELETE /api/admin/vod', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('id 누락 → 400', async () => {
-    const res = await vodDelete(makeAdminReq('DELETE', 'http://localhost/api/admin/vod'));
+    const res = await vodDelete(
+      makeAdminReq('DELETE', 'http://localhost/api/admin/vod'),
+    );
     expect(res.status).toBe(400);
   });
 
   it('정상 삭제 → 200', async () => {
     mockDeleteVod.mockResolvedValue();
-    const res = await vodDelete(makeAdminReq('DELETE', 'http://localhost/api/admin/vod?id=1'));
+    const res = await vodDelete(
+      makeAdminReq('DELETE', 'http://localhost/api/admin/vod?id=1'),
+    );
     expect(res.status).toBe(200);
     expect(mockDeleteVod).toHaveBeenCalledWith(1);
   });
 
   it('미인증 → 401', async () => {
-    const res = await vodDelete(makeUnauthReq('DELETE', 'http://localhost/api/admin/vod?id=1'));
+    const res = await vodDelete(
+      makeUnauthReq('DELETE', 'http://localhost/api/admin/vod?id=1'),
+    );
     expect(res.status).toBe(401);
   });
 });
@@ -210,24 +319,33 @@ describe('PATCH /api/admin/vod (embed toggle)', () => {
 
   it('embed 토글 성공', async () => {
     mockToggleVodEmbed.mockResolvedValue();
-    const res = await vodPatch(makeAdminReq('PATCH', 'http://localhost/api/admin/vod', {
-      id: 1, embedEnabled: false,
-    }));
+    const res = await vodPatch(
+      makeAdminReq('PATCH', 'http://localhost/api/admin/vod', {
+        id: 1,
+        embedEnabled: false,
+      }),
+    );
     expect(res.status).toBe(200);
     expect(mockToggleVodEmbed).toHaveBeenCalledWith(1, false);
   });
 
   it('잘못된 파라미터 → 400', async () => {
-    const res = await vodPatch(makeAdminReq('PATCH', 'http://localhost/api/admin/vod', {
-      id: 'abc', embedEnabled: false,
-    }));
+    const res = await vodPatch(
+      makeAdminReq('PATCH', 'http://localhost/api/admin/vod', {
+        id: 'abc',
+        embedEnabled: false,
+      }),
+    );
     expect(res.status).toBe(400);
   });
 
   it('미인증 → 401', async () => {
-    const res = await vodPatch(makeUnauthReq('PATCH', 'http://localhost/api/admin/vod', {
-      id: 1, embedEnabled: false,
-    }));
+    const res = await vodPatch(
+      makeUnauthReq('PATCH', 'http://localhost/api/admin/vod', {
+        id: 1,
+        embedEnabled: false,
+      }),
+    );
     expect(res.status).toBe(401);
   });
 });
@@ -237,20 +355,30 @@ describe('PATCH /api/admin/vod (description update)', () => {
 
   it('설명 수정 성공', async () => {
     mockUpdateVodMeta.mockResolvedValue();
-    const res = await vodPatch(makeAdminReq('PATCH', 'http://localhost/api/admin/vod', {
-      id: 1, description: '새로운 설명',
-    }));
+    const res = await vodPatch(
+      makeAdminReq('PATCH', 'http://localhost/api/admin/vod', {
+        id: 1,
+        description: '새로운 설명',
+      }),
+    );
     expect(res.status).toBe(200);
-    expect(mockUpdateVodMeta).toHaveBeenCalledWith(1, { description: '새로운 설명' });
+    expect(mockUpdateVodMeta).toHaveBeenCalledWith(1, {
+      description: '새로운 설명',
+    });
   });
 
   it('설명 앞뒤 공백 제거', async () => {
     mockUpdateVodMeta.mockResolvedValue();
-    const res = await vodPatch(makeAdminReq('PATCH', 'http://localhost/api/admin/vod', {
-      id: 1, description: '  공백 포함 설명  ',
-    }));
+    const res = await vodPatch(
+      makeAdminReq('PATCH', 'http://localhost/api/admin/vod', {
+        id: 1,
+        description: '  공백 포함 설명  ',
+      }),
+    );
     expect(res.status).toBe(200);
-    expect(mockUpdateVodMeta).toHaveBeenCalledWith(1, { description: '공백 포함 설명' });
+    expect(mockUpdateVodMeta).toHaveBeenCalledWith(1, {
+      description: '공백 포함 설명',
+    });
   });
 });
 
@@ -258,27 +386,51 @@ describe('PATCH /api/admin/vod/order', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('orderedIds 누락 → 400', async () => {
-    const res = await vodOrderPatch(makeAdminReq('PATCH', 'http://localhost/api/admin/vod/order', {}));
+    const res = await vodOrderPatch(
+      makeAdminReq('PATCH', 'http://localhost/api/admin/vod/order', {}),
+    );
     expect(res.status).toBe(400);
   });
 
   it('순서 변경 성공', async () => {
     mockUpdateVodOrder.mockResolvedValue([
-      { id: 2, title: 'B', youtubeId: 'bbb', description: '', order: 1, embedEnabled: false, createdAt: '2024-01-02' },
-      { id: 1, title: 'A', youtubeId: 'aaa', description: '설명A', order: 2, embedEnabled: true, createdAt: '2024-01-01' },
+      {
+        id: 2,
+        title: 'B',
+        youtubeId: 'bbb',
+        description: '',
+        order: 1,
+        embedEnabled: false,
+        createdAt: '2024-01-02',
+        publishedAt: null,
+      },
+      {
+        id: 1,
+        title: 'A',
+        youtubeId: 'aaa',
+        description: '설명A',
+        order: 2,
+        embedEnabled: true,
+        createdAt: '2024-01-01',
+        publishedAt: null,
+      },
     ]);
-    const res = await vodOrderPatch(makeAdminReq('PATCH', 'http://localhost/api/admin/vod/order', {
-      orderedIds: [2, 1],
-    }));
+    const res = await vodOrderPatch(
+      makeAdminReq('PATCH', 'http://localhost/api/admin/vod/order', {
+        orderedIds: [2, 1],
+      }),
+    );
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body[0].id).toBe(2);
   });
 
   it('미인증 → 401', async () => {
-    const res = await vodOrderPatch(makeUnauthReq('PATCH', 'http://localhost/api/admin/vod/order', {
-      orderedIds: [2, 1],
-    }));
+    const res = await vodOrderPatch(
+      makeUnauthReq('PATCH', 'http://localhost/api/admin/vod/order', {
+        orderedIds: [2, 1],
+      }),
+    );
     expect(res.status).toBe(401);
   });
 });

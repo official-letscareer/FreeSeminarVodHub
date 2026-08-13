@@ -7,17 +7,17 @@
 
 ## 기술 스택
 
-| 구분 | 기술 | 역할 |
-|------|------|------|
-| 프레임워크 | **Next.js 16** (App Router) | 프론트엔드 + API 서버 |
-| 언어 | **TypeScript** | 타입 안정성 |
-| 스타일링 | **Tailwind CSS v4** | UI 스타일 |
-| UI 컴포넌트 | **shadcn/ui** (Radix UI 기반) | 공통 컴포넌트 |
-| 데이터 저장 | **Supabase** | VOD·유저·배너 데이터 관리 |
-| 영상 플레이어 | **YouTube IFrame API** | 영상 재생 + 커스텀 컨트롤 |
-| 배포 | **Vercel** | 서버리스 호스팅 |
-| 코드 품질 | **ESLint + Prettier** | 린팅·포매팅 |
-| 테스트 | **Jest + Testing Library** | 단위 테스트 |
+| 구분          | 기술                          | 역할                      |
+| ------------- | ----------------------------- | ------------------------- |
+| 프레임워크    | **Next.js 16** (App Router)   | 프론트엔드 + API 서버     |
+| 언어          | **TypeScript**                | 타입 안정성               |
+| 스타일링      | **Tailwind CSS v4**           | UI 스타일                 |
+| UI 컴포넌트   | **shadcn/ui** (Radix UI 기반) | 공통 컴포넌트             |
+| 데이터 저장   | **Supabase**                  | VOD·유저·배너 데이터 관리 |
+| 영상 플레이어 | **YouTube IFrame API**        | 영상 재생 + 커스텀 컨트롤 |
+| 배포          | **Vercel**                    | 서버리스 호스팅           |
+| 코드 품질     | **ESLint + Prettier**         | 린팅·포매팅               |
+| 테스트        | **Jest + Testing Library**    | 단위 테스트               |
 
 ---
 
@@ -144,6 +144,9 @@ npm install
 # 렛츠커리어 API
 LETSCAREER_API_URL=
 
+# 렛츠커리어 SSO 로그인 페이지 (LC-3208, 브라우저에서 직접 리다이렉트하므로 NEXT_PUBLIC_ 접두사 필요)
+NEXT_PUBLIC_LETSCAREER_SSO_URL=
+
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
@@ -165,14 +168,14 @@ npm run dev
 
 ## 주요 명령어
 
-| 명령어 | 설명 |
-|--------|------|
-| `npm run dev` | 개발 서버 실행 |
-| `npm run build` | 프로덕션 빌드 |
-| `npm run start` | 프로덕션 서버 실행 |
-| `npm run lint` | ESLint 검사 |
-| `npm run format` | Prettier 포매팅 |
-| `npm test` | 테스트 실행 |
+| 명령어           | 설명               |
+| ---------------- | ------------------ |
+| `npm run dev`    | 개발 서버 실행     |
+| `npm run build`  | 프로덕션 빌드      |
+| `npm run start`  | 프로덕션 서버 실행 |
+| `npm run lint`   | ESLint 검사        |
+| `npm run format` | Prettier 포매팅    |
+| `npm test`       | 테스트 실행        |
 
 ---
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isAllowedUser, checkRateLimit } from '@/lib/kv';
+import { isAllowedUser, checkRateLimit, getAccessSettings } from '@/lib/kv';
+import { isEligibleForAccess } from '@/lib/accessControl';
 import { RATE_LIMIT } from '@/lib/constants';
 
 function isValidName(name: unknown): name is string {
@@ -23,23 +24,35 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ message: '잘못된 요청입니다.' }, { status: 400 });
+    return NextResponse.json(
+      { message: '잘못된 요청입니다.' },
+      { status: 400 },
+    );
   }
 
   const { name, phoneNum: rawPhone } = body as Record<string, unknown>;
-  console.log('verify request body:', JSON.stringify({ name, phoneNum: rawPhone }));
+  console.log(
+    'verify request body:',
+    JSON.stringify({ name, phoneNum: rawPhone }),
+  );
 
   if (!isValidName(name)) {
-    return NextResponse.json({ message: '이름을 입력해주세요.' }, { status: 400 });
+    return NextResponse.json(
+      { message: '이름을 입력해주세요.' },
+      { status: 400 },
+    );
   }
 
   // 하이픈, 공백 자동 제거
-  const phoneNum = typeof rawPhone === 'string' ? rawPhone.replace(/[-\s]/g, '') : rawPhone;
+  const phoneNum =
+    typeof rawPhone === 'string' ? rawPhone.replace(/[-\s]/g, '') : rawPhone;
 
   if (!isValidPhone(phoneNum)) {
     return NextResponse.json(
-      { message: '전화번호 형식이 올바르지 않습니다. (010으로 시작하는 11자리)' },
-      { status: 400 }
+      {
+        message: '전화번호 형식이 올바르지 않습니다. (010으로 시작하는 11자리)',
+      },
+      { status: 400 },
     );
   }
 
@@ -50,15 +63,18 @@ export async function POST(request: NextRequest) {
     const { allowed, remaining } = await checkRateLimit(
       rateLimitKey,
       RATE_LIMIT.MAX_REQUESTS,
-      RATE_LIMIT.WINDOW_SECONDS
+      RATE_LIMIT.WINDOW_SECONDS,
     );
     if (!allowed) {
       return NextResponse.json(
         { message: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' },
         {
           status: 429,
-          headers: { 'Retry-After': String(RATE_LIMIT.WINDOW_SECONDS), 'X-RateLimit-Remaining': String(remaining) },
-        }
+          headers: {
+            'Retry-After': String(RATE_LIMIT.WINDOW_SECONDS),
+            'X-RateLimit-Remaining': String(remaining),
+          },
+        },
       );
     }
   } catch {
@@ -67,6 +83,7 @@ export async function POST(request: NextRequest) {
 
   const trimmedName = name.trim();
   let isChallenge = false;
+  let optionCodes: string[] = [];
 
   // 1) 예외 유저 테이블 확인
   try {
@@ -84,11 +101,17 @@ export async function POST(request: NextRequest) {
     // 2) 렛츠커리어 서버 v2 API 호출
     const apiUrl = process.env.LETSCAREER_API_URL;
     if (!apiUrl) {
-      return NextResponse.json({ message: '서버 설정 오류입니다.' }, { status: 500 });
+      return NextResponse.json(
+        { message: '서버 설정 오류입니다.' },
+        { status: 500 },
+      );
     }
     try {
       // 외부 API에는 원본 전화번호 전달 (하이픈 포함 형식으로 매칭)
-      const requestBody = JSON.stringify({ name: trimmedName, phoneNum: rawPhone });
+      const requestBody = JSON.stringify({
+        name: trimmedName,
+        phoneNum: rawPhone,
+      });
       const fullUrl = `${apiUrl}/api/v2/user/verify-challenge`;
       console.log('verify-challenge URL:', fullUrl);
       console.log('verify-challenge request:', requestBody);
@@ -111,16 +134,40 @@ export async function POST(request: NextRequest) {
           isChallenge = data.data;
         } else if (typeof data?.data?.isChallenge === 'boolean') {
           isChallenge = data.data.isChallenge;
+          if (Array.isArray(data?.data?.optionCodes))
+            optionCodes = data.data.optionCodes;
         } else if (typeof data?.isChallenge === 'boolean') {
           isChallenge = data.isChallenge;
+          if (Array.isArray(data?.optionCodes)) optionCodes = data.optionCodes;
         }
       } else {
         const errorBody = await res.text().catch(() => '');
-        console.error(`verify-challenge failed: status=${res.status}, body=${errorBody}`);
-        return NextResponse.json({ message: '서버 연결에 실패했습니다.' }, { status: 502 });
+        console.error(
+          `verify-challenge failed: status=${res.status}, body=${errorBody}`,
+        );
+        return NextResponse.json(
+          { message: '서버 연결에 실패했습니다.' },
+          { status: 502 },
+        );
       }
     } catch {
-      return NextResponse.json({ message: '서버 연결에 실패했습니다.' }, { status: 502 });
+      return NextResponse.json(
+        { message: '서버 연결에 실패했습니다.' },
+        { status: 502 },
+      );
+    }
+
+    // 3) 챌린지 참여자/옵션 필터(LC-3208) — 예외 유저는 이 단계를 타지 않는다.
+    // 백엔드 호출 자체를 안 거치는 우회라 여기서 걸러지지 않고 그대로 유지된다.
+    if (isChallenge) {
+      try {
+        const settings = await getAccessSettings();
+        isChallenge = isEligibleForAccess(settings, true, optionCodes);
+      } catch (err) {
+        console.error('getAccessSettings error:', err);
+        // 설정 조회 실패 시 필터를 적용하지 못하지만, 기존 통과자를 막는 쪽보다
+        // 통과시키는 쪽이 장애 영향이 작다고 판단해 그대로 통과시킨다.
+      }
     }
   }
 
