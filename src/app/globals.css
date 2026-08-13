@@ -55,7 +55,9 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  /* 렛츠커리어 브랜드 컬러(#4D55F5)로 맞춘다 — VOD 사이트가 렛커 서비스라는 인상을
+     주기 위한 최소한의 손질이라 primary만 바꾸고 나머지 중립 톤은 그대로 둔다. */
+  --primary: #4d55f5;
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);

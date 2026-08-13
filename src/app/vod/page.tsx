@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import SiteHeader from '@/components/site-header';
 import VodCard from '@/components/vod-card';
 import VodListItem from '@/components/vod-list-item';
 import BannerCarousel from '@/components/banner-carousel';
@@ -54,12 +55,14 @@ export default function VodListPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-4 py-3 flex items-center justify-between">
-        <h1 className="text-lg font-bold text-gray-900">챌린지 VOD</h1>
-        <Button variant="ghost" size="sm" onClick={handleLogout}>
-          로그아웃
-        </Button>
-      </header>
+      <SiteHeader
+        left={<h1 className="truncate text-lg font-bold text-gray-900">챌린지 VOD</h1>}
+        right={
+          <Button variant="ghost" size="sm" onClick={handleLogout}>
+            로그아웃
+          </Button>
+        }
+      />
 
       <BannerCarousel position="list" />
       <main className="max-w-5xl mx-auto px-4 py-6">
@@ -72,7 +75,7 @@ export default function VodListPage() {
             <button
               onClick={() => handleViewMode('grid')}
               title="썸네일뷰"
-              className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-gray-200 text-gray-900' : 'text-gray-400 hover:text-gray-700'}`}
+              className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-primary/10 text-primary' : 'text-gray-400 hover:text-gray-700'}`}
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M3 3h7v7H3V3zm0 11h7v7H3v-7zm11-11h7v7h-7V3zm0 11h7v7h-7v-7z" />
@@ -81,7 +84,7 @@ export default function VodListPage() {
             <button
               onClick={() => handleViewMode('list')}
               title="리스트뷰"
-              className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-gray-200 text-gray-900' : 'text-gray-400 hover:text-gray-700'}`}
+              className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-primary/10 text-primary' : 'text-gray-400 hover:text-gray-700'}`}
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M3 5h18v2H3V5zm0 6h18v2H3v-2zm0 6h18v2H3v-2z" />

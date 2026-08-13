@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog,
@@ -1160,17 +1161,12 @@ export default function AdminVodPage() {
                     <p className="text-sm font-medium text-gray-900">챌린지 참여 필수</p>
                     <p className="text-xs text-gray-500">켜면 활성 챌린지 참여자가 아닌 사람은 통과하지 못한다.</p>
                   </div>
-                  <Button
-                    type="button"
-                    variant={accessSettings.requireChallengeParticipation ? 'default' : 'outline'}
-                    size="sm"
+                  <Switch
+                    checked={accessSettings.requireChallengeParticipation}
                     disabled={accessSettingsSaving}
-                    onClick={() =>
-                      handleToggleRequireParticipation(!accessSettings.requireChallengeParticipation)
-                    }
-                  >
-                    {accessSettings.requireChallengeParticipation ? '켜짐' : '꺼짐'}
-                  </Button>
+                    onCheckedChange={handleToggleRequireParticipation}
+                    aria-label="챌린지 참여 필수 여부"
+                  />
                 </div>
 
                 <div className="flex items-center justify-between gap-4">
@@ -1178,15 +1174,12 @@ export default function AdminVodPage() {
                     <p className="text-sm font-medium text-gray-900">옵션 필수</p>
                     <p className="text-xs text-gray-500">켜면 아래 허용 옵션 코드를 하나도 갖지 않은 사람은 통과하지 못한다.</p>
                   </div>
-                  <Button
-                    type="button"
-                    variant={accessSettings.requireChallengeOption ? 'default' : 'outline'}
-                    size="sm"
+                  <Switch
+                    checked={accessSettings.requireChallengeOption}
                     disabled={accessSettingsSaving}
-                    onClick={() => handleToggleRequireOption(!accessSettings.requireChallengeOption)}
-                  >
-                    {accessSettings.requireChallengeOption ? '켜짐' : '꺼짐'}
-                  </Button>
+                    onCheckedChange={handleToggleRequireOption}
+                    aria-label="옵션 필수 여부"
+                  />
                 </div>
 
                 <div className="space-y-2">

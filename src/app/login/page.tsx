@@ -133,7 +133,8 @@ export default function LoginPage() {
           className="w-full"
           onClick={handleSsoLogin}
         >
-          렛츠커리어로 로그인
+          <img src="/logo/logo-simple.svg" alt="" className="h-4 w-4" />
+          렛츠커리어로 로그인하기
         </Button>
       </div>
     </div>

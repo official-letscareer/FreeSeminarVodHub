@@ -47,11 +47,11 @@ describe('LoginPage — SSO 버튼 (LC-3208)', () => {
     expect(screen.getByRole('button', { name: '확인' })).toBeInTheDocument();
   });
 
-  it('"렛츠커리어로 로그인" 클릭 시 SSO 로그인 페이지로 redirect_uri와 함께 이동한다', () => {
+  it('"렛츠커리어로 로그인하기" 클릭 시 SSO 로그인 페이지로 redirect_uri와 함께 이동한다', () => {
     render(<LoginPage />);
 
     fireEvent.click(
-      screen.getByRole('button', { name: '렛츠커리어로 로그인' }),
+      screen.getByRole('button', { name: '렛츠커리어로 로그인하기' }),
     );
 
     const expectedRedirectUri = `${window.location.origin}/auth/callback`;
@@ -65,7 +65,7 @@ describe('LoginPage — SSO 버튼 (LC-3208)', () => {
     render(<LoginPage />);
 
     fireEvent.click(
-      screen.getByRole('button', { name: '렛츠커리어로 로그인' }),
+      screen.getByRole('button', { name: '렛츠커리어로 로그인하기' }),
     );
 
     expect(
