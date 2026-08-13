@@ -12,9 +12,26 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL;
+const title = '세미나 VOD';
+const description = '챌린지 참여자 전용 VOD 스트리밍 서비스';
+
 export const metadata: Metadata = {
-  title: '세미나 VOD',
-  description: '챌린지 참여자 전용 VOD 스트리밍 서비스',
+  ...(SITE_URL ? { metadataBase: new URL(SITE_URL) } : {}),
+  title,
+  description,
+  openGraph: {
+    title,
+    description,
+    siteName: title,
+    locale: 'ko_KR',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title,
+    description,
+  },
 };
 
 export default function RootLayout({
