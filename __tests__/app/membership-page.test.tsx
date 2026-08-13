@@ -27,20 +27,20 @@ describe('MembershipLoginPage — VOD 로그인 진입점 (LC-3208)', () => {
     process.env = ORIGINAL_ENV;
   });
 
-  it('이름+전화번호 폼 없이 "VOD 로그인" 버튼만 보여준다', () => {
+  it('이름+전화번호 폼 없이 "멤버십 가입자 로그인" 버튼만 보여준다', () => {
     render(<MembershipLoginPage />);
 
     expect(
-      screen.getByRole('button', { name: 'VOD 로그인' }),
+      screen.getByRole('button', { name: '멤버십 가입자 로그인' }),
     ).toBeInTheDocument();
     expect(screen.queryByLabelText('이름')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('전화번호')).not.toBeInTheDocument();
   });
 
-  it('"VOD 로그인" 클릭 시 SSO 로그인 페이지로 redirect_uri·service_name과 함께 이동한다', () => {
+  it('"멤버십 가입자 로그인" 클릭 시 SSO 로그인 페이지로 redirect_uri·service_name과 함께 이동한다', () => {
     render(<MembershipLoginPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'VOD 로그인' }));
+    fireEvent.click(screen.getByRole('button', { name: '멤버십 가입자 로그인' }));
 
     const expectedRedirectUri = `${window.location.origin}/auth/callback`;
     expect(navigateToMock).toHaveBeenCalledWith(
@@ -52,7 +52,7 @@ describe('MembershipLoginPage — VOD 로그인 진입점 (LC-3208)', () => {
     delete process.env.NEXT_PUBLIC_LETSCAREER_SSO_URL;
     render(<MembershipLoginPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'VOD 로그인' }));
+    fireEvent.click(screen.getByRole('button', { name: '멤버십 가입자 로그인' }));
 
     expect(
       screen.getByText('SSO 로그인이 아직 설정되지 않았습니다.'),
