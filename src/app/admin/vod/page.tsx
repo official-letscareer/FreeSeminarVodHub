@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { VodItem, AllowedUser, PremiumUser, Banner } from '@/lib/types';
+import { VodItem, AllowedUser, PremiumUser, Banner, AccessSettings } from '@/lib/types';
 
 function formatPhoneNum(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 11);
@@ -116,6 +116,17 @@ export default function AdminVodPage() {
   const [editingPremiumName, setEditingPremiumName] = useState('');
   const [editingPremiumPhone, setEditingPremiumPhone] = useState('');
 
+  // ─── 챌린지 참여/옵션 필터 상태(LC-3208) ───────────────────────────
+  const [accessSettings, setAccessSettings] = useState<AccessSettings>({
+    requireChallengeParticipation: false,
+    requireChallengeOption: false,
+    allowedOptionCodes: [],
+  });
+  const [accessSettingsLoading, setAccessSettingsLoading] = useState(true);
+  const [accessSettingsSaving, setAccessSettingsSaving] = useState(false);
+  const [accessSettingsError, setAccessSettingsError] = useState('');
+  const [newOptionCode, setNewOptionCode] = useState('');
+
   // ─── 배너 상태 ────────────────────────────────────────────────────
   const [banners, setBanners] = useState<Banner[]>([]);
   const [bannersLoading, setBannersLoading] = useState(true);
@@ -192,12 +203,27 @@ export default function AdminVodPage() {
     }
   }, []);
 
+  // ─── 챌린지 참여/옵션 필터 설정 로드(LC-3208) ──────────────────────
+  const fetchAccessSettings = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/access-settings');
+      if (res.status === 401) return;
+      const data = await res.json();
+      setAccessSettings(data);
+    } catch {
+      // 조용히 무시
+    } finally {
+      setAccessSettingsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchVodList();
     fetchUsers();
     fetchPremiumUsers();
     fetchBanners();
-  }, [fetchVodList, fetchUsers, fetchPremiumUsers, fetchBanners]);
+    fetchAccessSettings();
+  }, [fetchVodList, fetchUsers, fetchPremiumUsers, fetchBanners, fetchAccessSettings]);
 
   // ─── VOD 핸들러 ───────────────────────────────────────────────────
   async function handleAdd(e: React.FormEvent) {
@@ -680,6 +706,52 @@ export default function AdminVodPage() {
     await fetchBanners();
   }
 
+  // ─── 챌린지 참여/옵션 필터 핸들러(LC-3208) ─────────────────────────
+  async function saveAccessSettings(updates: Partial<AccessSettings>) {
+    setAccessSettingsSaving(true);
+    setAccessSettingsError('');
+    try {
+      const res = await fetch('/api/admin/access-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setAccessSettingsError(data?.message || '설정 저장에 실패했습니다.');
+        return;
+      }
+      const data = await res.json();
+      setAccessSettings(data);
+    } catch {
+      setAccessSettingsError('설정 저장에 실패했습니다.');
+    } finally {
+      setAccessSettingsSaving(false);
+    }
+  }
+
+  function handleToggleRequireParticipation(checked: boolean) {
+    saveAccessSettings({ requireChallengeParticipation: checked });
+  }
+
+  function handleToggleRequireOption(checked: boolean) {
+    saveAccessSettings({ requireChallengeOption: checked });
+  }
+
+  function handleAddOptionCode(e: React.FormEvent) {
+    e.preventDefault();
+    const code = newOptionCode.trim();
+    if (!code || accessSettings.allowedOptionCodes.includes(code)) return;
+    saveAccessSettings({ allowedOptionCodes: [...accessSettings.allowedOptionCodes, code] });
+    setNewOptionCode('');
+  }
+
+  function handleRemoveOptionCode(code: string) {
+    saveAccessSettings({
+      allowedOptionCodes: accessSettings.allowedOptionCodes.filter((c) => c !== code),
+    });
+  }
+
   async function handleLogout() {
     await fetch('/api/admin/auth', { method: 'DELETE' });
     router.push('/admin');
@@ -1063,6 +1135,100 @@ export default function AdminVodPage() {
                   </li>
                 ))}
               </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ── 챌린지 참여/옵션 필터 설정(LC-3208) ─────────────────────── */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">챌린지 참여/옵션 필터 설정</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {accessSettingsLoading ? (
+              <p className="text-sm text-gray-500">불러오는 중...</p>
+            ) : (
+              <>
+                {accessSettingsError && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{accessSettingsError}</AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">챌린지 참여 필수</p>
+                    <p className="text-xs text-gray-500">켜면 활성 챌린지 참여자가 아닌 사람은 통과하지 못한다.</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant={accessSettings.requireChallengeParticipation ? 'default' : 'outline'}
+                    size="sm"
+                    disabled={accessSettingsSaving}
+                    onClick={() =>
+                      handleToggleRequireParticipation(!accessSettings.requireChallengeParticipation)
+                    }
+                  >
+                    {accessSettings.requireChallengeParticipation ? '켜짐' : '꺼짐'}
+                  </Button>
+                </div>
+
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">옵션 필수</p>
+                    <p className="text-xs text-gray-500">켜면 아래 허용 옵션 코드를 하나도 갖지 않은 사람은 통과하지 못한다.</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant={accessSettings.requireChallengeOption ? 'default' : 'outline'}
+                    size="sm"
+                    disabled={accessSettingsSaving}
+                    onClick={() => handleToggleRequireOption(!accessSettings.requireChallengeOption)}
+                  >
+                    {accessSettings.requireChallengeOption ? '켜짐' : '꺼짐'}
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-900">허용 옵션 코드</p>
+                  <p className="text-xs text-gray-500">챌린지 개설 화면의 옵션 코드(예: WFB1, PLUS1)를 등록한다.</p>
+                  <form onSubmit={handleAddOptionCode} className="flex gap-2">
+                    <Input
+                      placeholder="옵션 코드 (예: WFB1)"
+                      value={newOptionCode}
+                      onChange={(e) => setNewOptionCode(e.target.value)}
+                      disabled={accessSettingsSaving}
+                      className="flex-1"
+                    />
+                    <Button type="submit" size="sm" disabled={accessSettingsSaving || !newOptionCode.trim()}>
+                      추가
+                    </Button>
+                  </form>
+                  {accessSettings.allowedOptionCodes.length === 0 ? (
+                    <p className="text-sm text-gray-500">등록된 옵션 코드가 없습니다.</p>
+                  ) : (
+                    <ul className="flex flex-wrap gap-2">
+                      {accessSettings.allowedOptionCodes.map((code) => (
+                        <li
+                          key={code}
+                          className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1 text-sm text-gray-700"
+                        >
+                          {code}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveOptionCode(code)}
+                            disabled={accessSettingsSaving}
+                            className="text-gray-400 hover:text-gray-700"
+                            aria-label={`${code} 삭제`}
+                          >
+                            ×
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
