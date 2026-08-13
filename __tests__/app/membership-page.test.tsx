@@ -9,7 +9,7 @@ jest.mock('@/lib/navigate', () => ({
   navigateTo: (...args: unknown[]) => navigateToMock(...args),
 }));
 
-import MembershipLoginPage from '@/app/membership/page';
+import MembershipLoginPage, { metadata } from '@/app/membership/page';
 
 describe('MembershipLoginPage — VOD 로그인 진입점 (LC-3208)', () => {
   const ORIGINAL_ENV = process.env;
@@ -71,5 +71,29 @@ describe('MembershipLoginPage — VOD 로그인 진입점 (LC-3208)', () => {
     expect(
       screen.getByText('로그인에 실패했습니다. 다시 시도해주세요.'),
     ).toBeInTheDocument();
+  });
+});
+
+describe('MembershipLoginPage — 메타데이터', () => {
+  it('루트 공용 문구가 아니라 멤버십 전용 제목·설명을 쓴다', () => {
+    expect(metadata.title).toBe('프리미엄 세미나 VOD');
+    expect(metadata.description).toBe(
+      '프리미엄 멤버십 가입자 전용 세미나 VOD 다시보기',
+    );
+  });
+
+  it('OG·트위터 카드에도 같은 문구를 싣는다', () => {
+    expect(metadata.openGraph).toMatchObject({
+      title: '프리미엄 세미나 VOD',
+      description: '프리미엄 멤버십 가입자 전용 세미나 VOD 다시보기',
+    });
+    expect(metadata.twitter).toMatchObject({
+      card: 'summary_large_image',
+      title: '프리미엄 세미나 VOD',
+    });
+  });
+
+  it('로그인 진입점이라 검색 인덱싱은 막는다', () => {
+    expect(metadata.robots).toMatchObject({ index: false, follow: false });
   });
 });
