@@ -13,7 +13,7 @@ export async function GET() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: '#4D55F5',
+          background: 'white',
         }}
       >
         <LogoMark size={282} />

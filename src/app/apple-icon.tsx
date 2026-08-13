@@ -3,6 +3,8 @@ import { LogoMark } from '@/lib/brandMark';
 
 // 애플은 아이콘 배경에 자체 라운드·그림자를 입히므로 여기선 투명 없이
 // 꽉 찬 정사각형 배경만 준다(투명 배경은 iOS에서 검은 배경으로 뒤집힌다).
+// 실제 로고(logo-simple.svg)가 흰/투명 배경 위 보라색 마크로 쓰이는 것과
+// 맞춰 흰 배경 + 브랜드 컬러 마크로 그린다.
 export const size = { width: 180, height: 180 };
 export const contentType = 'image/png';
 
@@ -16,7 +18,7 @@ export default function AppleIcon() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: '#4D55F5',
+          background: 'white',
         }}
       >
         <LogoMark size={100} />
