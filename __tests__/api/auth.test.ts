@@ -2,10 +2,18 @@ jest.mock('@/lib/kv');
 
 import { POST } from '@/app/api/auth/verify/route';
 import { NextRequest } from 'next/server';
-import { isAllowedUser, checkRateLimit } from '@/lib/kv';
+import { isAllowedUser, checkRateLimit, getAccessSettings } from '@/lib/kv';
+import { AccessSettings } from '@/lib/types';
 
 const mockIsAllowedUser = isAllowedUser as jest.MockedFunction<typeof isAllowedUser>;
 const mockCheckRateLimit = checkRateLimit as jest.MockedFunction<typeof checkRateLimit>;
+const mockGetAccessSettings = getAccessSettings as jest.MockedFunction<typeof getAccessSettings>;
+
+const OFF_SETTINGS: AccessSettings = {
+  requireChallengeParticipation: false,
+  requireChallengeOption: false,
+  allowedOptionCodes: [],
+};
 
 const originalFetch = global.fetch;
 
@@ -23,6 +31,9 @@ describe('POST /api/auth/verify', () => {
     global.fetch = jest.fn();
     mockIsAllowedUser.mockResolvedValue(false);
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 4 });
+    // 필터가 둘 다 꺼진 기본값 — LC-3208 이전과 동일하게 동작해야 하는 기존
+    // 테스트들이 이 기본값으로 그대로 통과한다. 필터 자체는 별도 describe에서 검증.
+    mockGetAccessSettings.mockResolvedValue(OFF_SETTINGS);
     process.env.LETSCAREER_API_URL = 'https://api.example.com';
   });
 
@@ -237,5 +248,86 @@ describe('POST /api/auth/verify', () => {
 
     const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
     expect(res.status).toBe(200);
+  });
+
+  // ─── 챌린지 참여자/옵션 필터(LC-3208) ────────────────────────────
+  describe('챌린지 참여자/옵션 필터(LC-3208)', () => {
+    it('참여 필터가 켜져 있어도 외부 API가 isChallenge:true를 준 시점에 이미 참여가 확인된 것이라 통과한다', async () => {
+      mockGetAccessSettings.mockResolvedValue({
+        requireChallengeParticipation: true,
+        requireChallengeOption: false,
+        allowedOptionCodes: [],
+      });
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => true,
+      });
+
+      const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+      const body = await res.json();
+      expect(body.isChallenge).toBe(true);
+    });
+
+    it('옵션 필터가 켜져 있고 허용 옵션 코드를 하나도 안 갖고 있으면 isChallenge:false', async () => {
+      mockGetAccessSettings.mockResolvedValue({
+        requireChallengeParticipation: false,
+        requireChallengeOption: true,
+        allowedOptionCodes: ['WFB1', 'LFB2'],
+      });
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: { isChallenge: true, optionCodes: ['PLUS1'] } }),
+      });
+
+      const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+      const body = await res.json();
+      expect(body.isChallenge).toBe(false);
+    });
+
+    it('옵션 필터가 켜져 있고 허용 옵션 코드를 하나라도 갖고 있으면 통과한다', async () => {
+      mockGetAccessSettings.mockResolvedValue({
+        requireChallengeParticipation: false,
+        requireChallengeOption: true,
+        allowedOptionCodes: ['WFB1', 'LFB2'],
+      });
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: { isChallenge: true, optionCodes: ['WFB1'] } }),
+      });
+
+      const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+      const body = await res.json();
+      expect(body.isChallenge).toBe(true);
+    });
+
+    it('설정 조회(getAccessSettings) 실패 시에도 요청은 통과시킨다(필터 미적용, fail-open)', async () => {
+      mockGetAccessSettings.mockRejectedValue(new Error('Supabase error'));
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: { isChallenge: true, optionCodes: [] } }),
+      });
+
+      const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+      const body = await res.json();
+      expect(body.isChallenge).toBe(true);
+    });
+
+    it('예외 유저는 필터를 타지 않는다 — getAccessSettings가 호출되지 않는다', async () => {
+      mockIsAllowedUser.mockResolvedValue(true);
+      mockGetAccessSettings.mockResolvedValue({
+        requireChallengeParticipation: true,
+        requireChallengeOption: true,
+        allowedOptionCodes: ['WFB1'],
+      });
+
+      const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+      const body = await res.json();
+      expect(body.isChallenge).toBe(true);
+      expect(mockGetAccessSettings).not.toHaveBeenCalled();
+    });
   });
 });

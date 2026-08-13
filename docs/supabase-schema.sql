@@ -45,8 +45,18 @@ CREATE TABLE banners (
 -- 기존 테이블에 추가 시 (마이그레이션용)
 -- CREATE TABLE IF NOT EXISTS banners ( ... );
 
+-- 챌린지 참여자/옵션 필터 설정 테이블 (LC-3208, 싱글턴 — 행이 1개만 있다고 가정)
+CREATE TABLE access_settings (
+  id BIGSERIAL PRIMARY KEY,
+  require_challenge_participation BOOLEAN NOT NULL DEFAULT false,
+  require_challenge_option BOOLEAN NOT NULL DEFAULT false,
+  allowed_option_codes TEXT[] NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- RLS 비활성화 (API Routes에서 인증 처리)
 ALTER TABLE vods DISABLE ROW LEVEL SECURITY;
 ALTER TABLE allowed_users DISABLE ROW LEVEL SECURITY;
 ALTER TABLE rate_limits DISABLE ROW LEVEL SECURITY;
 ALTER TABLE banners DISABLE ROW LEVEL SECURITY;
+ALTER TABLE access_settings DISABLE ROW LEVEL SECURITY;

@@ -20,7 +20,32 @@ describe('getSsoUserProfile', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it('정상 응답이면 name을 반환하고 Bearer 헤더로 호출한다', async () => {
+  it('정상 응답이면 name·챌린지 참여여부·옵션 코드를 반환하고 Bearer 헤더로 호출한다', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        status: 200,
+        message: 'OK',
+        data: { name: '홍길동', isActiveChallengeParticipant: true, optionCodes: ['WFB1', 'LFB2'] },
+      }),
+    });
+
+    const result = await getSsoUserProfile('access.jwt.value');
+
+    expect(result).toEqual({
+      name: '홍길동',
+      isActiveChallengeParticipant: true,
+      optionCodes: ['WFB1', 'LFB2'],
+    });
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://api.example.com/api/v2/user/sso-profile',
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer access.jwt.value' },
+      }),
+    );
+  });
+
+  it('isActiveChallengeParticipant·optionCodes가 응답에 없으면 각각 false·빈 배열로 채운다', async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: async () => ({ status: 200, message: 'OK', data: { name: '홍길동' } }),
@@ -28,13 +53,11 @@ describe('getSsoUserProfile', () => {
 
     const result = await getSsoUserProfile('access.jwt.value');
 
-    expect(result).toEqual({ name: '홍길동' });
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://api.example.com/api/v2/user/sso-profile',
-      expect.objectContaining({
-        headers: { Authorization: 'Bearer access.jwt.value' },
-      }),
-    );
+    expect(result).toEqual({
+      name: '홍길동',
+      isActiveChallengeParticipant: false,
+      optionCodes: [],
+    });
   });
 
   it('401(만료·위조 토큰) 응답이면 null 반환', async () => {

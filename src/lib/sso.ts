@@ -11,6 +11,8 @@ export const SSO_REFRESH_TOKEN_COOKIE = 'sso_refresh_token';
 
 export interface SsoUserProfile {
   name: string;
+  isActiveChallengeParticipant: boolean;
+  optionCodes: string[];
 }
 
 /**
@@ -21,6 +23,9 @@ export interface SsoUserProfile {
  * 나눠 들고 있으면 유출 시 모든 서비스의 JWT를 위조할 수 있게 되므로, 검증은 발급처인
  * 렛커 서버에 위임한다. 그 대가로 요청마다 네트워크 호출이 하나 더 붙지만, 이 프로젝트
  * 규모에서는 감수할 만하다고 판단했다(확정 사항 6).
+ *
+ * 챌린지 참여 여부·옵션 코드도 함께 내려받는다 — 로그인(토큰 유효성)과는 별개로,
+ * VOD가 "이 사람이 접근 조건을 만족하는가"를 판단할 인가(authorization) 근거다.
  */
 export async function getSsoUserProfile(
   token: string
@@ -36,10 +41,14 @@ export async function getSsoUserProfile(
     if (!res.ok) return null;
 
     const body = await res.json();
-    const name = body?.data?.name;
-    if (typeof name !== 'string') return null;
+    const data = body?.data;
+    if (typeof data?.name !== 'string') return null;
 
-    return { name };
+    return {
+      name: data.name,
+      isActiveChallengeParticipant: data.isActiveChallengeParticipant === true,
+      optionCodes: Array.isArray(data.optionCodes) ? data.optionCodes : [],
+    };
   } catch {
     return null;
   }

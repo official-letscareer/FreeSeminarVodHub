@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isAllowedUser, checkRateLimit } from '@/lib/kv';
+import { isAllowedUser, checkRateLimit, getAccessSettings } from '@/lib/kv';
+import { isEligibleForAccess } from '@/lib/accessControl';
 import { RATE_LIMIT } from '@/lib/constants';
 
 function isValidName(name: unknown): name is string {
@@ -67,6 +68,7 @@ export async function POST(request: NextRequest) {
 
   const trimmedName = name.trim();
   let isChallenge = false;
+  let optionCodes: string[] = [];
 
   // 1) 예외 유저 테이블 확인
   try {
@@ -111,8 +113,10 @@ export async function POST(request: NextRequest) {
           isChallenge = data.data;
         } else if (typeof data?.data?.isChallenge === 'boolean') {
           isChallenge = data.data.isChallenge;
+          if (Array.isArray(data?.data?.optionCodes)) optionCodes = data.data.optionCodes;
         } else if (typeof data?.isChallenge === 'boolean') {
           isChallenge = data.isChallenge;
+          if (Array.isArray(data?.optionCodes)) optionCodes = data.optionCodes;
         }
       } else {
         const errorBody = await res.text().catch(() => '');
@@ -121,6 +125,19 @@ export async function POST(request: NextRequest) {
       }
     } catch {
       return NextResponse.json({ message: '서버 연결에 실패했습니다.' }, { status: 502 });
+    }
+
+    // 3) 챌린지 참여자/옵션 필터(LC-3208) — 예외 유저는 이 단계를 타지 않는다.
+    // 백엔드 호출 자체를 안 거치는 우회라 여기서 걸러지지 않고 그대로 유지된다.
+    if (isChallenge) {
+      try {
+        const settings = await getAccessSettings();
+        isChallenge = isEligibleForAccess(settings, true, optionCodes);
+      } catch (err) {
+        console.error('getAccessSettings error:', err);
+        // 설정 조회 실패 시 필터를 적용하지 못하지만, 기존 통과자를 막는 쪽보다
+        // 통과시키는 쪽이 장애 영향이 작다고 판단해 그대로 통과시킨다.
+      }
     }
   }
 

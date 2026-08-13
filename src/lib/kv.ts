@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { VodItem, AllowedUser, PremiumUser, Banner } from './types';
+import { VodItem, AllowedUser, PremiumUser, Banner, AccessSettings } from './types';
 
 function getSupabase() {
   if (!supabase) throw new Error('Supabase가 설정되지 않았습니다.');
@@ -405,3 +405,83 @@ export async function checkRateLimit(
 
   return { allowed, remaining: Math.max(0, maxRequests - currentCount - (allowed ? 1 : 0)) };
 }
+
+// ─── 챌린지 참여자/옵션 필터 설정(LC-3208) ──────────────────────────────────
+// 단일 행(싱글턴) 테이블이다. 행이 아직 없으면(초기 상태) 둘 다 꺼진 기본값을 쓴다 —
+// 렛커 로그인만 되면 통과하던 기존 동작을 그대로 유지하기 위해서다.
+const DEFAULT_ACCESS_SETTINGS: AccessSettings = {
+  requireChallengeParticipation: false,
+  requireChallengeOption: false,
+  allowedOptionCodes: [],
+};
+
+function toAccessSettings(row: Record<string, unknown>): AccessSettings {
+  return {
+    requireChallengeParticipation: row.require_challenge_participation === true,
+    requireChallengeOption: row.require_challenge_option === true,
+    allowedOptionCodes: Array.isArray(row.allowed_option_codes)
+      ? (row.allowed_option_codes as string[])
+      : [],
+  };
+}
+
+export async function getAccessSettings(): Promise<AccessSettings> {
+  const { data, error } = await getSupabase()
+    .from('access_settings')
+    .select('*')
+    .order('id', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return DEFAULT_ACCESS_SETTINGS;
+  return toAccessSettings(data);
+}
+
+export async function updateAccessSettings(
+  settings: Partial<AccessSettings>
+): Promise<AccessSettings> {
+  const { data: existing, error: selectError } = await getSupabase()
+    .from('access_settings')
+    .select('id')
+    .order('id', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (selectError) throw selectError;
+
+  const updates: Record<string, unknown> = {};
+  if (settings.requireChallengeParticipation !== undefined) {
+    updates.require_challenge_participation = settings.requireChallengeParticipation;
+  }
+  if (settings.requireChallengeOption !== undefined) {
+    updates.require_challenge_option = settings.requireChallengeOption;
+  }
+  if (settings.allowedOptionCodes !== undefined) {
+    updates.allowed_option_codes = settings.allowedOptionCodes;
+  }
+
+  if (existing) {
+    const { data, error } = await getSupabase()
+      .from('access_settings')
+      .update(updates)
+      .eq('id', existing.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return toAccessSettings(data);
+  }
+
+  const { data, error } = await getSupabase()
+    .from('access_settings')
+    .insert({ ...DEFAULT_ACCESS_SETTINGS_ROW, ...updates })
+    .select()
+    .single();
+  if (error) throw error;
+  return toAccessSettings(data);
+}
+
+const DEFAULT_ACCESS_SETTINGS_ROW = {
+  require_challenge_participation: false,
+  require_challenge_option: false,
+  allowed_option_codes: [],
+};
