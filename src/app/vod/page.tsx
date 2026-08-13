@@ -56,7 +56,7 @@ export default function VodListPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <SiteHeader
-        left={<h1 className="truncate text-lg font-bold text-gray-900">챌린지 VOD</h1>}
+        left={<h1 className="truncate text-lg font-bold text-gray-900">챌린지 다시보기</h1>}
         right={
           <Button variant="ghost" size="sm" onClick={handleLogout}>
             로그아웃
@@ -64,7 +64,11 @@ export default function VodListPage() {
         }
       />
 
-      <BannerCarousel position="list" />
+      {/* 헤더·본문과 같은 max-w-5xl 폭으로 맞춘다 — 예전엔 배너만 화면 끝까지
+          꽉 채워서 아래 영상 목록과 좌우 폭이 어긋나 보였다. */}
+      <div className="max-w-5xl mx-auto px-4 pt-4">
+        <BannerCarousel position="list" />
+      </div>
       <main className="max-w-5xl mx-auto px-4 py-6">
         {error && (
           <p className="text-center text-sm text-red-500 mb-4">{error}</p>

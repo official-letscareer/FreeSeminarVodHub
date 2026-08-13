@@ -41,7 +41,7 @@ export default function MembershipLoginPage() {
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold text-gray-900">
-            멤버십 챌린지 VOD
+            멤버십 다시보기
           </h1>
           <p className="mt-2 text-sm text-gray-600">
             프리미엄 멤버십 참여자 전용입니다
