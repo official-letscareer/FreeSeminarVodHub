@@ -14,7 +14,7 @@ export default function Icon() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: '#4D55F5',
+          background: 'white',
         }}
       >
         <LogoMark size={20} />
