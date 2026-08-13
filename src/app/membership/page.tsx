@@ -55,7 +55,11 @@ export default function MembershipLoginPage() {
         )}
 
         <Button type="button" className="w-full" onClick={handleSsoLogin}>
-          <img src="/logo/logo-simple.svg" alt="" className="h-4 w-4 brightness-0 invert" />
+          <img
+            src="/logo/logo-simple.svg"
+            alt=""
+            className="h-4 w-4 brightness-0 invert"
+          />
           멤버십 가입자 로그인
         </Button>
       </div>

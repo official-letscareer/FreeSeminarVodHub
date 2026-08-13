@@ -8,10 +8,16 @@ import { getEnabledVodList, getVodList, getAccessSettings } from '@/lib/kv';
 import { getSsoUserProfile, SSO_ACCESS_TOKEN_COOKIE } from '@/lib/sso';
 import { AccessSettings } from '@/lib/types';
 
-const mockGetEnabledVodList = getEnabledVodList as jest.MockedFunction<typeof getEnabledVodList>;
+const mockGetEnabledVodList = getEnabledVodList as jest.MockedFunction<
+  typeof getEnabledVodList
+>;
 const mockGetVodList = getVodList as jest.MockedFunction<typeof getVodList>;
-const mockGetSsoUserProfile = getSsoUserProfile as jest.MockedFunction<typeof getSsoUserProfile>;
-const mockGetAccessSettings = getAccessSettings as jest.MockedFunction<typeof getAccessSettings>;
+const mockGetSsoUserProfile = getSsoUserProfile as jest.MockedFunction<
+  typeof getSsoUserProfile
+>;
+const mockGetAccessSettings = getAccessSettings as jest.MockedFunction<
+  typeof getAccessSettings
+>;
 
 const OFF_SETTINGS: AccessSettings = {
   requireChallengeParticipation: false,
@@ -36,8 +42,26 @@ function makeUnauthReq(url: string): NextRequest {
 }
 
 const mockList = [
-  { id: 1, title: 'A', youtubeId: 'aaa', description: '설명A', order: 1, embedEnabled: true, createdAt: '2024-01-01' },
-  { id: 2, title: 'B', youtubeId: 'bbb', description: '', order: 2, embedEnabled: true, createdAt: '2024-01-02' },
+  {
+    id: 1,
+    title: 'A',
+    youtubeId: 'aaa',
+    description: '설명A',
+    order: 1,
+    embedEnabled: true,
+    createdAt: '2024-01-01',
+    publishedAt: null,
+  },
+  {
+    id: 2,
+    title: 'B',
+    youtubeId: 'bbb',
+    description: '',
+    order: 2,
+    embedEnabled: true,
+    createdAt: '2024-01-02',
+    publishedAt: null,
+  },
 ];
 
 describe('GET /api/vod', () => {
@@ -191,9 +215,12 @@ describe('GET /api/vod/[id]', () => {
   });
 
   it('인증 없을 때 401 반환', async () => {
-    const res = await vodDetailGet(makeUnauthReq('http://localhost/api/vod/1'), {
-      params: Promise.resolve({ id: '1' }),
-    });
+    const res = await vodDetailGet(
+      makeUnauthReq('http://localhost/api/vod/1'),
+      {
+        params: Promise.resolve({ id: '1' }),
+      },
+    );
     expect(res.status).toBe(401);
   });
 
@@ -217,9 +244,12 @@ describe('GET /api/vod/[id]', () => {
   });
 
   it('잘못된 ID 400 반환', async () => {
-    const res = await vodDetailGet(makeAuthReq('http://localhost/api/vod/abc'), {
-      params: Promise.resolve({ id: 'abc' }),
-    });
+    const res = await vodDetailGet(
+      makeAuthReq('http://localhost/api/vod/abc'),
+      {
+        params: Promise.resolve({ id: 'abc' }),
+      },
+    );
     expect(res.status).toBe(400);
   });
 

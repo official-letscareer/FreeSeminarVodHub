@@ -14,7 +14,9 @@ export type VodAccessResult =
  * (/api/auth/verify)에 이미 확인했으므로 여기서 다시 확인하지 않는다. SSO 로그인은
  * 로그인 자체를 막지 않는 설계라(PRD 확정 사항 6), 접근 시점인 여기서 확인한다.
  */
-export async function checkVodAccess(request: NextRequest): Promise<VodAccessResult> {
+export async function checkVodAccess(
+  request: NextRequest,
+): Promise<VodAccessResult> {
   if (request.cookies.get('auth_verified')?.value === '1') {
     return { authorized: true };
   }
@@ -33,7 +35,7 @@ export async function checkVodAccess(request: NextRequest): Promise<VodAccessRes
   const eligible = isEligibleForAccess(
     settings,
     profile.isActiveChallengeParticipant,
-    profile.optionCodes
+    profile.optionCodes,
   );
   if (!eligible) {
     return { authorized: false, reason: 'ineligible' };

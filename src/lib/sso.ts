@@ -28,7 +28,7 @@ export interface SsoUserProfile {
  * VOD가 "이 사람이 접근 조건을 만족하는가"를 판단할 인가(authorization) 근거다.
  */
 export async function getSsoUserProfile(
-  token: string
+  token: string,
 ): Promise<SsoUserProfile | null> {
   const apiUrl = process.env.LETSCAREER_API_URL;
   if (!apiUrl) return null;

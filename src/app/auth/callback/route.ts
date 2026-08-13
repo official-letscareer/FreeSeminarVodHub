@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  SSO_ACCESS_TOKEN_COOKIE,
-  SSO_REFRESH_TOKEN_COOKIE,
-} from '@/lib/sso';
+import { SSO_ACCESS_TOKEN_COOKIE, SSO_REFRESH_TOKEN_COOKIE } from '@/lib/sso';
 
 /**
  * 렛커 SSO 로그인 페이지가 로그인 성공 후 돌려보내는 콜백. 두 형태를 모두 받는다:
@@ -12,11 +9,14 @@ import {
  *   기존 포맷 그대로라, 소셜 로그인 쪽 서버 코드는 건드리지 않고 여기서 흡수한다.
  */
 function extractTokens(
-  searchParams: URLSearchParams
+  searchParams: URLSearchParams,
 ): { accessToken: string; refreshToken: string | null } | null {
   const token = searchParams.get('token');
   if (token) {
-    return { accessToken: token, refreshToken: searchParams.get('refreshToken') };
+    return {
+      accessToken: token,
+      refreshToken: searchParams.get('refreshToken'),
+    };
   }
 
   const result = searchParams.get('result');
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 
   if (!tokens) {
     return NextResponse.redirect(
-      new URL('/login?error=sso_failed', request.url)
+      new URL('/login?error=sso_failed', request.url),
     );
   }
 

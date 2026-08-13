@@ -5,9 +5,15 @@ import { NextRequest } from 'next/server';
 import { isAllowedUser, checkRateLimit, getAccessSettings } from '@/lib/kv';
 import { AccessSettings } from '@/lib/types';
 
-const mockIsAllowedUser = isAllowedUser as jest.MockedFunction<typeof isAllowedUser>;
-const mockCheckRateLimit = checkRateLimit as jest.MockedFunction<typeof checkRateLimit>;
-const mockGetAccessSettings = getAccessSettings as jest.MockedFunction<typeof getAccessSettings>;
+const mockIsAllowedUser = isAllowedUser as jest.MockedFunction<
+  typeof isAllowedUser
+>;
+const mockCheckRateLimit = checkRateLimit as jest.MockedFunction<
+  typeof checkRateLimit
+>;
+const mockGetAccessSettings = getAccessSettings as jest.MockedFunction<
+  typeof getAccessSettings
+>;
 
 const OFF_SETTINGS: AccessSettings = {
   requireChallengeParticipation: false,
@@ -81,7 +87,9 @@ describe('POST /api/auth/verify', () => {
       json: async () => true,
     });
 
-    const res = await POST(makeRequest({ name: '홍길동', phoneNum: '010-1234-5678' }));
+    const res = await POST(
+      makeRequest({ name: '홍길동', phoneNum: '010-1234-5678' }),
+    );
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.isChallenge).toBe(true);
@@ -94,7 +102,9 @@ describe('POST /api/auth/verify', () => {
       json: async () => true,
     });
 
-    const res = await POST(makeRequest({ name: '홍길동', phoneNum: '010 1234 5678' }));
+    const res = await POST(
+      makeRequest({ name: '홍길동', phoneNum: '010 1234 5678' }),
+    );
     expect(res.status).toBe(200);
   });
 
@@ -102,7 +112,9 @@ describe('POST /api/auth/verify', () => {
   it('예외 유저 등록됨 → isChallenge: true (외부 API 미호출)', async () => {
     mockIsAllowedUser.mockResolvedValue(true);
 
-    const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+    const res = await POST(
+      makeRequest({ name: '홍길동', phoneNum: '01012345678' }),
+    );
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.isChallenge).toBe(true);
@@ -117,7 +129,9 @@ describe('POST /api/auth/verify', () => {
       json: async () => true,
     });
 
-    const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+    const res = await POST(
+      makeRequest({ name: '홍길동', phoneNum: '01012345678' }),
+    );
     expect(res.status).toBe(200);
     expect(global.fetch).toHaveBeenCalled();
   });
@@ -130,7 +144,9 @@ describe('POST /api/auth/verify', () => {
       json: async () => true,
     });
 
-    const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+    const res = await POST(
+      makeRequest({ name: '홍길동', phoneNum: '01012345678' }),
+    );
     const body = await res.json();
     expect(body.isChallenge).toBe(true);
   });
@@ -142,7 +158,9 @@ describe('POST /api/auth/verify', () => {
       json: async () => ({ data: true }),
     });
 
-    const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+    const res = await POST(
+      makeRequest({ name: '홍길동', phoneNum: '01012345678' }),
+    );
     const body = await res.json();
     expect(body.isChallenge).toBe(true);
   });
@@ -154,7 +172,9 @@ describe('POST /api/auth/verify', () => {
       json: async () => ({ data: { isChallenge: true } }),
     });
 
-    const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+    const res = await POST(
+      makeRequest({ name: '홍길동', phoneNum: '01012345678' }),
+    );
     const body = await res.json();
     expect(body.isChallenge).toBe(true);
   });
@@ -166,7 +186,9 @@ describe('POST /api/auth/verify', () => {
       json: async () => ({ isChallenge: false }),
     });
 
-    const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+    const res = await POST(
+      makeRequest({ name: '홍길동', phoneNum: '01012345678' }),
+    );
     const body = await res.json();
     expect(body.isChallenge).toBe(false);
   });
@@ -178,7 +200,9 @@ describe('POST /api/auth/verify', () => {
       status: 404,
     });
 
-    const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+    const res = await POST(
+      makeRequest({ name: '홍길동', phoneNum: '01012345678' }),
+    );
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.isChallenge).toBe(false);
@@ -191,14 +215,18 @@ describe('POST /api/auth/verify', () => {
       text: async () => 'Internal Server Error',
     });
 
-    const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+    const res = await POST(
+      makeRequest({ name: '홍길동', phoneNum: '01012345678' }),
+    );
     expect(res.status).toBe(502);
   });
 
   it('외부 API 네트워크 에러 → 502 반환', async () => {
     (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
 
-    const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+    const res = await POST(
+      makeRequest({ name: '홍길동', phoneNum: '01012345678' }),
+    );
     expect(res.status).toBe(502);
   });
 
@@ -206,7 +234,9 @@ describe('POST /api/auth/verify', () => {
   it('LETSCAREER_API_URL 미설정 시 500 반환', async () => {
     delete process.env.LETSCAREER_API_URL;
 
-    const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+    const res = await POST(
+      makeRequest({ name: '홍길동', phoneNum: '01012345678' }),
+    );
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.message).toBe('서버 설정 오류입니다.');
@@ -216,7 +246,9 @@ describe('POST /api/auth/verify', () => {
   it('isChallenge: true 시 auth_verified 쿠키 설정', async () => {
     mockIsAllowedUser.mockResolvedValue(true);
 
-    const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+    const res = await POST(
+      makeRequest({ name: '홍길동', phoneNum: '01012345678' }),
+    );
     const cookie = res.headers.get('set-cookie');
     expect(cookie).toContain('auth_verified=1');
   });
@@ -227,7 +259,9 @@ describe('POST /api/auth/verify', () => {
       status: 404,
     });
 
-    const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+    const res = await POST(
+      makeRequest({ name: '홍길동', phoneNum: '01012345678' }),
+    );
     const cookie = res.headers.get('set-cookie');
     expect(cookie).toBeNull();
   });
@@ -236,7 +270,9 @@ describe('POST /api/auth/verify', () => {
   it('Rate Limit 초과 시 429 반환', async () => {
     mockCheckRateLimit.mockResolvedValue({ allowed: false, remaining: 0 });
 
-    const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+    const res = await POST(
+      makeRequest({ name: '홍길동', phoneNum: '01012345678' }),
+    );
     expect(res.status).toBe(429);
     const body = await res.json();
     expect(body.message).toContain('요청이 너무 많습니다');
@@ -246,7 +282,9 @@ describe('POST /api/auth/verify', () => {
     mockCheckRateLimit.mockRejectedValue(new Error('Redis error'));
     mockIsAllowedUser.mockResolvedValue(true);
 
-    const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+    const res = await POST(
+      makeRequest({ name: '홍길동', phoneNum: '01012345678' }),
+    );
     expect(res.status).toBe(200);
   });
 
@@ -264,7 +302,9 @@ describe('POST /api/auth/verify', () => {
         json: async () => true,
       });
 
-      const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+      const res = await POST(
+        makeRequest({ name: '홍길동', phoneNum: '01012345678' }),
+      );
       const body = await res.json();
       expect(body.isChallenge).toBe(true);
     });
@@ -278,10 +318,14 @@ describe('POST /api/auth/verify', () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ data: { isChallenge: true, optionCodes: ['PLUS1'] } }),
+        json: async () => ({
+          data: { isChallenge: true, optionCodes: ['PLUS1'] },
+        }),
       });
 
-      const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+      const res = await POST(
+        makeRequest({ name: '홍길동', phoneNum: '01012345678' }),
+      );
       const body = await res.json();
       expect(body.isChallenge).toBe(false);
     });
@@ -295,10 +339,14 @@ describe('POST /api/auth/verify', () => {
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ data: { isChallenge: true, optionCodes: ['WFB1'] } }),
+        json: async () => ({
+          data: { isChallenge: true, optionCodes: ['WFB1'] },
+        }),
       });
 
-      const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+      const res = await POST(
+        makeRequest({ name: '홍길동', phoneNum: '01012345678' }),
+      );
       const body = await res.json();
       expect(body.isChallenge).toBe(true);
     });
@@ -311,7 +359,9 @@ describe('POST /api/auth/verify', () => {
         json: async () => ({ data: { isChallenge: true, optionCodes: [] } }),
       });
 
-      const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+      const res = await POST(
+        makeRequest({ name: '홍길동', phoneNum: '01012345678' }),
+      );
       const body = await res.json();
       expect(body.isChallenge).toBe(true);
     });
@@ -324,7 +374,9 @@ describe('POST /api/auth/verify', () => {
         allowedOptionCodes: ['WFB1'],
       });
 
-      const res = await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+      const res = await POST(
+        makeRequest({ name: '홍길동', phoneNum: '01012345678' }),
+      );
       const body = await res.json();
       expect(body.isChallenge).toBe(true);
       expect(mockGetAccessSettings).not.toHaveBeenCalled();

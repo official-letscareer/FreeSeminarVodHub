@@ -72,12 +72,17 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold text-gray-900">세미나 VOD</h1>
-          <p className="mt-2 text-sm text-gray-600">이름과 전화번호로 참여를 확인합니다</p>
+          <p className="mt-2 text-sm text-gray-600">
+            이름과 전화번호로 참여를 확인합니다
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="name"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               이름
             </label>
             <Input
@@ -92,7 +97,10 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label htmlFor="phoneNum" className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="phoneNum"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               전화번호
             </label>
             <Input

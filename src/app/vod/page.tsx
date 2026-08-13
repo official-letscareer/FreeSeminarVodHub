@@ -22,7 +22,10 @@ export default function VodListPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
 
   useEffect(() => {
+    // localStorage는 서버 렌더 시점엔 없어서 lazy initializer로 옮길 수 없다 —
+    // 마운트 후 한 번만 읽어 하이드레이션 이후 값을 반영하는 의도적인 패턴이다.
     const saved = localStorage.getItem(STORAGE_KEY);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (saved === 'list' || saved === 'grid') setViewMode(saved);
   }, []);
 
@@ -56,7 +59,11 @@ export default function VodListPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <SiteHeader
-        left={<h1 className="truncate text-lg font-bold text-gray-900">세미나 VOD</h1>}
+        left={
+          <h1 className="truncate text-lg font-bold text-gray-900">
+            세미나 VOD
+          </h1>
+        }
         right={
           <Button variant="ghost" size="sm" onClick={handleLogout}>
             로그아웃
@@ -100,7 +107,10 @@ export default function VodListPage() {
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="rounded-lg overflow-hidden border bg-white shadow-sm">
+              <div
+                key={i}
+                className="rounded-lg overflow-hidden border bg-white shadow-sm"
+              >
                 <Skeleton className="aspect-video w-full" />
                 <div className="p-3">
                   <Skeleton className="h-4 w-3/4" />

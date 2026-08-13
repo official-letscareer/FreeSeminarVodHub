@@ -7,7 +7,10 @@ function isAdminAuthorized(request: NextRequest): boolean {
 
 export async function GET(request: NextRequest) {
   if (!isAdminAuthorized(request)) {
-    return NextResponse.json({ message: '인증이 필요합니다.' }, { status: 401 });
+    return NextResponse.json(
+      { message: '인증이 필요합니다.' },
+      { status: 401 },
+    );
   }
   const settings = await getAccessSettings();
   return NextResponse.json(settings);
@@ -15,18 +18,27 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   if (!isAdminAuthorized(request)) {
-    return NextResponse.json({ message: '인증이 필요합니다.' }, { status: 401 });
+    return NextResponse.json(
+      { message: '인증이 필요합니다.' },
+      { status: 401 },
+    );
   }
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ message: '잘못된 요청입니다.' }, { status: 400 });
+    return NextResponse.json(
+      { message: '잘못된 요청입니다.' },
+      { status: 400 },
+    );
   }
 
-  const { requireChallengeParticipation, requireChallengeOption, allowedOptionCodes } =
-    body as Record<string, unknown>;
+  const {
+    requireChallengeParticipation,
+    requireChallengeOption,
+    allowedOptionCodes,
+  } = body as Record<string, unknown>;
 
   if (
     requireChallengeParticipation !== undefined &&
@@ -34,13 +46,16 @@ export async function PATCH(request: NextRequest) {
   ) {
     return NextResponse.json(
       { message: 'requireChallengeParticipation은 boolean이어야 합니다.' },
-      { status: 400 }
+      { status: 400 },
     );
   }
-  if (requireChallengeOption !== undefined && typeof requireChallengeOption !== 'boolean') {
+  if (
+    requireChallengeOption !== undefined &&
+    typeof requireChallengeOption !== 'boolean'
+  ) {
     return NextResponse.json(
       { message: 'requireChallengeOption은 boolean이어야 합니다.' },
-      { status: 400 }
+      { status: 400 },
     );
   }
   if (
@@ -50,7 +65,7 @@ export async function PATCH(request: NextRequest) {
   ) {
     return NextResponse.json(
       { message: 'allowedOptionCodes는 문자열 배열이어야 합니다.' },
-      { status: 400 }
+      { status: 400 },
     );
   }
 

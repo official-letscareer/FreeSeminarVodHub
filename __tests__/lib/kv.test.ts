@@ -22,19 +22,34 @@ import {
 
 const mockFrom = supabase!.from as jest.Mock;
 
-function createChain(result: { data?: unknown; error?: unknown; count?: number | null }) {
+function createChain(result: {
+  data?: unknown;
+  error?: unknown;
+  count?: number | null;
+}) {
   const resolveValue = {
     data: result.data ?? null,
     error: result.error ?? null,
     count: result.count ?? null,
   };
   const chain: Record<string, unknown> = {};
-  const methods = ['select', 'insert', 'update', 'delete', 'order', 'eq', 'gte', 'lt', 'limit'];
+  const methods = [
+    'select',
+    'insert',
+    'update',
+    'delete',
+    'order',
+    'eq',
+    'gte',
+    'lt',
+    'limit',
+  ];
   for (const method of methods) {
     chain[method] = jest.fn(() => chain);
   }
   chain.single = jest.fn(() => Promise.resolve(resolveValue));
-  chain.then = (resolve: (v: unknown) => void) => Promise.resolve(resolveValue).then(resolve);
+  chain.then = (resolve: (v: unknown) => void) =>
+    Promise.resolve(resolveValue).then(resolve);
   return chain;
 }
 
@@ -46,8 +61,24 @@ describe('kv (Supabase)', () => {
   describe('getVodList', () => {
     it('VOD 목록 반환', async () => {
       const rows = [
-        { id: 1, title: 'A', youtube_id: 'aaa', description: '설명A', order: 1, embed_enabled: true, created_at: '2024-01-01' },
-        { id: 2, title: 'B', youtube_id: 'bbb', description: '', order: 2, embed_enabled: false, created_at: '2024-01-02' },
+        {
+          id: 1,
+          title: 'A',
+          youtube_id: 'aaa',
+          description: '설명A',
+          order: 1,
+          embed_enabled: true,
+          created_at: '2024-01-01',
+        },
+        {
+          id: 2,
+          title: 'B',
+          youtube_id: 'bbb',
+          description: '',
+          order: 2,
+          embed_enabled: false,
+          created_at: '2024-01-02',
+        },
       ];
       mockFrom.mockReturnValue(createChain({ data: rows }));
 
@@ -76,14 +107,22 @@ describe('kv (Supabase)', () => {
   describe('getEnabledVodList', () => {
     it('embed_enabled: true인 VOD만 반환', async () => {
       const rows = [
-        { id: 1, title: 'A', youtube_id: 'aaa', description: '', order: 1, embed_enabled: true, created_at: '2024-01-01' },
+        {
+          id: 1,
+          title: 'A',
+          youtube_id: 'aaa',
+          description: '',
+          order: 1,
+          embed_enabled: true,
+          created_at: '2024-01-01',
+        },
       ];
       const chain = createChain({ data: rows });
       mockFrom.mockReturnValue(chain);
 
       const result = await getEnabledVodList();
       expect(result).toHaveLength(1);
-      expect((chain.eq as jest.Mock)).toHaveBeenCalledWith('embed_enabled', true);
+      expect(chain.eq as jest.Mock).toHaveBeenCalledWith('embed_enabled', true);
     });
   });
 
@@ -91,11 +130,26 @@ describe('kv (Supabase)', () => {
     it('새 VOD 추가 (기존 VOD 있을 때)', async () => {
       const maxOrderChain = createChain({ data: { order: 3 } });
       const insertChain = createChain({
-        data: { id: 4, title: 'New', youtube_id: 'xyz', description: '새 설명', order: 4, embed_enabled: true, created_at: '2024-01-01' },
+        data: {
+          id: 4,
+          title: 'New',
+          youtube_id: 'xyz',
+          description: '새 설명',
+          order: 4,
+          embed_enabled: true,
+          created_at: '2024-01-01',
+        },
       });
-      mockFrom.mockReturnValueOnce(maxOrderChain).mockReturnValueOnce(insertChain);
+      mockFrom
+        .mockReturnValueOnce(maxOrderChain)
+        .mockReturnValueOnce(insertChain);
 
-      const result = await addVod({ title: 'New', youtubeId: 'xyz', description: '새 설명' });
+      const result = await addVod({
+        title: 'New',
+        youtubeId: 'xyz',
+        description: '새 설명',
+        publishedAt: null,
+      });
       expect(result.id).toBe(4);
       expect(result.title).toBe('New');
       expect(result.description).toBe('새 설명');
@@ -105,11 +159,26 @@ describe('kv (Supabase)', () => {
     it('첫 VOD 추가 (기존 없을 때)', async () => {
       const maxOrderChain = createChain({ data: null });
       const insertChain = createChain({
-        data: { id: 1, title: 'First', youtube_id: 'abc', description: '', order: 1, embed_enabled: true, created_at: '2024-01-01' },
+        data: {
+          id: 1,
+          title: 'First',
+          youtube_id: 'abc',
+          description: '',
+          order: 1,
+          embed_enabled: true,
+          created_at: '2024-01-01',
+        },
       });
-      mockFrom.mockReturnValueOnce(maxOrderChain).mockReturnValueOnce(insertChain);
+      mockFrom
+        .mockReturnValueOnce(maxOrderChain)
+        .mockReturnValueOnce(insertChain);
 
-      const result = await addVod({ title: 'First', youtubeId: 'abc', description: '' });
+      const result = await addVod({
+        title: 'First',
+        youtubeId: 'abc',
+        description: '',
+        publishedAt: null,
+      });
       expect(result.order).toBe(1);
     });
   });
@@ -121,8 +190,24 @@ describe('kv (Supabase)', () => {
       // 2) getVodList (after delete)
       const listChain = createChain({
         data: [
-          { id: 1, title: 'A', youtube_id: 'a', description: '', order: 1, embed_enabled: true, created_at: '' },
-          { id: 3, title: 'C', youtube_id: 'c', description: '', order: 3, embed_enabled: true, created_at: '' },
+          {
+            id: 1,
+            title: 'A',
+            youtube_id: 'a',
+            description: '',
+            order: 1,
+            embed_enabled: true,
+            created_at: '',
+          },
+          {
+            id: 3,
+            title: 'C',
+            youtube_id: 'c',
+            description: '',
+            order: 3,
+            embed_enabled: true,
+            created_at: '',
+          },
         ],
       });
       // 3+) reorder updates
@@ -146,13 +231,19 @@ describe('kv (Supabase)', () => {
       mockFrom.mockReturnValue(chain);
 
       await updateVodDescription(1, '새로운 설명');
-      expect((chain.update as jest.Mock)).toHaveBeenCalledWith({ description: '새로운 설명' });
-      expect((chain.eq as jest.Mock)).toHaveBeenCalledWith('id', 1);
+      expect(chain.update as jest.Mock).toHaveBeenCalledWith({
+        description: '새로운 설명',
+      });
+      expect(chain.eq as jest.Mock).toHaveBeenCalledWith('id', 1);
     });
 
     it('Supabase 에러 시 throw', async () => {
-      mockFrom.mockReturnValue(createChain({ error: { message: 'update error' } }));
-      await expect(updateVodDescription(1, 'test')).rejects.toEqual({ message: 'update error' });
+      mockFrom.mockReturnValue(
+        createChain({ error: { message: 'update error' } }),
+      );
+      await expect(updateVodDescription(1, 'test')).rejects.toEqual({
+        message: 'update error',
+      });
     });
   });
 
@@ -162,8 +253,10 @@ describe('kv (Supabase)', () => {
       mockFrom.mockReturnValue(chain);
 
       await toggleVodEmbed(1, false);
-      expect((chain.update as jest.Mock)).toHaveBeenCalledWith({ embed_enabled: false });
-      expect((chain.eq as jest.Mock)).toHaveBeenCalledWith('id', 1);
+      expect(chain.update as jest.Mock).toHaveBeenCalledWith({
+        embed_enabled: false,
+      });
+      expect(chain.eq as jest.Mock).toHaveBeenCalledWith('id', 1);
     });
   });
 
@@ -174,8 +267,24 @@ describe('kv (Supabase)', () => {
       const update2 = createChain({ data: null });
       const listChain = createChain({
         data: [
-          { id: 2, title: 'B', youtube_id: 'b', description: '', order: 1, embed_enabled: true, created_at: '' },
-          { id: 1, title: 'A', youtube_id: 'a', description: '', order: 2, embed_enabled: true, created_at: '' },
+          {
+            id: 2,
+            title: 'B',
+            youtube_id: 'b',
+            description: '',
+            order: 1,
+            embed_enabled: true,
+            created_at: '',
+          },
+          {
+            id: 1,
+            title: 'A',
+            youtube_id: 'a',
+            description: '',
+            order: 2,
+            embed_enabled: true,
+            created_at: '',
+          },
         ],
       });
 
@@ -193,7 +302,12 @@ describe('kv (Supabase)', () => {
   describe('getAllowedUsers', () => {
     it('예외 유저 목록 반환', async () => {
       const rows = [
-        { id: 1, name: '홍길동', phone_num: '01012345678', created_at: '2024-01-01' },
+        {
+          id: 1,
+          name: '홍길동',
+          phone_num: '01012345678',
+          created_at: '2024-01-01',
+        },
       ];
       mockFrom.mockReturnValue(createChain({ data: rows }));
 
@@ -208,13 +322,21 @@ describe('kv (Supabase)', () => {
   describe('addAllowedUser', () => {
     it('예외 유저 추가', async () => {
       const chain = createChain({
-        data: { id: 1, name: '홍길동', phone_num: '01012345678', created_at: '2024-01-01' },
+        data: {
+          id: 1,
+          name: '홍길동',
+          phone_num: '01012345678',
+          created_at: '2024-01-01',
+        },
       });
       mockFrom.mockReturnValue(chain);
 
       const result = await addAllowedUser('홍길동', '01012345678');
       expect(result.name).toBe('홍길동');
-      expect((chain.insert as jest.Mock)).toHaveBeenCalledWith({ name: '홍길동', phone_num: '01012345678' });
+      expect(chain.insert as jest.Mock).toHaveBeenCalledWith({
+        name: '홍길동',
+        phone_num: '01012345678',
+      });
     });
   });
 
@@ -224,7 +346,7 @@ describe('kv (Supabase)', () => {
       mockFrom.mockReturnValue(chain);
 
       await deleteAllowedUser(1);
-      expect((chain.eq as jest.Mock)).toHaveBeenCalledWith('id', 1);
+      expect(chain.eq as jest.Mock).toHaveBeenCalledWith('id', 1);
     });
   });
 

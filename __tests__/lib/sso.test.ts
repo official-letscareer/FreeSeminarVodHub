@@ -26,7 +26,11 @@ describe('getSsoUserProfile', () => {
       json: async () => ({
         status: 200,
         message: 'OK',
-        data: { name: '홍길동', isActiveChallengeParticipant: true, optionCodes: ['WFB1', 'LFB2'] },
+        data: {
+          name: '홍길동',
+          isActiveChallengeParticipant: true,
+          optionCodes: ['WFB1', 'LFB2'],
+        },
       }),
     });
 
@@ -48,7 +52,11 @@ describe('getSsoUserProfile', () => {
   it('isActiveChallengeParticipant·optionCodes가 응답에 없으면 각각 false·빈 배열로 채운다', async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: async () => ({ status: 200, message: 'OK', data: { name: '홍길동' } }),
+      json: async () => ({
+        status: 200,
+        message: 'OK',
+        data: { name: '홍길동' },
+      }),
     });
 
     const result = await getSsoUserProfile('access.jwt.value');

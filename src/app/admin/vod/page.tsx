@@ -15,7 +15,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { VodItem, AllowedUser, PremiumUser, Banner, AccessSettings } from '@/lib/types';
+import {
+  VodItem,
+  AllowedUser,
+  PremiumUser,
+  Banner,
+  AccessSettings,
+} from '@/lib/types';
 
 function formatPhoneNum(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 11);
@@ -31,7 +37,9 @@ const AdminThumbnail = memo(function AdminThumbnail({
   youtubeId: string;
   title: string;
 }) {
-  const [src, setSrc] = useState(`https://img.youtube.com/vi/${youtubeId}/default.jpg`);
+  const [src, setSrc] = useState(
+    `https://img.youtube.com/vi/${youtubeId}/default.jpg`,
+  );
   const [failed, setFailed] = useState(false);
 
   function handleError() {
@@ -45,8 +53,18 @@ const AdminThumbnail = memo(function AdminThumbnail({
   if (failed) {
     return (
       <div className="w-20 h-12 rounded shrink-0 bg-gray-200 flex items-center justify-center">
-        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+        <svg
+          className="w-5 h-5 text-gray-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"
+          />
         </svg>
       </div>
     );
@@ -80,7 +98,9 @@ export default function AdminVodPage() {
   const [editingDescText, setEditingDescText] = useState('');
   const [editingTitleId, setEditingTitleId] = useState<number | null>(null);
   const [editingTitleText, setEditingTitleText] = useState('');
-  const [editingPublishedAtId, setEditingPublishedAtId] = useState<number | null>(null);
+  const [editingPublishedAtId, setEditingPublishedAtId] = useState<
+    number | null
+  >(null);
   const [editingPublishedAtText, setEditingPublishedAtText] = useState('');
 
   // ─── 예외 유저 상태 ───────────────────────────────────────────────
@@ -90,11 +110,19 @@ export default function AdminVodPage() {
   const [userPhone, setUserPhone] = useState('');
   const [userAddLoading, setUserAddLoading] = useState(false);
   const [userError, setUserError] = useState('');
-  const [deleteUserTarget, setDeleteUserTarget] = useState<AllowedUser | null>(null);
-  const [selectedUserIds, setSelectedUserIds] = useState<Set<number>>(new Set());
+  const [deleteUserTarget, setDeleteUserTarget] = useState<AllowedUser | null>(
+    null,
+  );
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<number>>(
+    new Set(),
+  );
   const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
   const [csvUploadLoading, setCsvUploadLoading] = useState(false);
-  const [csvResult, setCsvResult] = useState<{ added: number; skipped: number; errors: string[] } | null>(null);
+  const [csvResult, setCsvResult] = useState<{
+    added: number;
+    skipped: number;
+    errors: string[];
+  } | null>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [editingUserName, setEditingUserName] = useState('');
@@ -107,11 +135,19 @@ export default function AdminVodPage() {
   const [premiumPhone, setPremiumPhone] = useState('');
   const [premiumAddLoading, setPremiumAddLoading] = useState(false);
   const [premiumError, setPremiumError] = useState('');
-  const [deletePremiumTarget, setDeletePremiumTarget] = useState<PremiumUser | null>(null);
-  const [selectedPremiumIds, setSelectedPremiumIds] = useState<Set<number>>(new Set());
-  const [premiumBulkDeleteLoading, setPremiumBulkDeleteLoading] = useState(false);
+  const [deletePremiumTarget, setDeletePremiumTarget] =
+    useState<PremiumUser | null>(null);
+  const [selectedPremiumIds, setSelectedPremiumIds] = useState<Set<number>>(
+    new Set(),
+  );
+  const [premiumBulkDeleteLoading, setPremiumBulkDeleteLoading] =
+    useState(false);
   const [premiumCsvUploadLoading, setPremiumCsvUploadLoading] = useState(false);
-  const [premiumCsvResult, setPremiumCsvResult] = useState<{ added: number; skipped: number; errors: string[] } | null>(null);
+  const [premiumCsvResult, setPremiumCsvResult] = useState<{
+    added: number;
+    skipped: number;
+    errors: string[];
+  } | null>(null);
   const premiumCsvInputRef = useRef<HTMLInputElement>(null);
   const [editingPremiumId, setEditingPremiumId] = useState<number | null>(null);
   const [editingPremiumName, setEditingPremiumName] = useState('');
@@ -132,16 +168,20 @@ export default function AdminVodPage() {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [bannersLoading, setBannersLoading] = useState(true);
   const [bannerLinkUrl, setBannerLinkUrl] = useState('');
-  const [bannerPosition, setBannerPosition] = useState<Banner['position']>('both');
+  const [bannerPosition, setBannerPosition] =
+    useState<Banner['position']>('both');
   const [bannerIsRandom, setBannerIsRandom] = useState(false);
   const [bannerAddLoading, setBannerAddLoading] = useState(false);
   const [bannerError, setBannerError] = useState('');
-  const [editingBannerLinkId, setEditingBannerLinkId] = useState<number | null>(null);
+  const [editingBannerLinkId, setEditingBannerLinkId] = useState<number | null>(
+    null,
+  );
   const [editingBannerLinkText, setEditingBannerLinkText] = useState('');
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const [editingBannerId, setEditingBannerId] = useState<number | null>(null);
   const [editingBannerLinkUrl, setEditingBannerLinkUrl] = useState('');
-  const [editingBannerPosition, setEditingBannerPosition] = useState<Banner['position']>('both');
+  const [editingBannerPosition, setEditingBannerPosition] =
+    useState<Banner['position']>('both');
   const [editingBannerIsRandom, setEditingBannerIsRandom] = useState(false);
 
   // ─── VOD 데이터 로드 ──────────────────────────────────────────────
@@ -224,7 +264,13 @@ export default function AdminVodPage() {
     fetchPremiumUsers();
     fetchBanners();
     fetchAccessSettings();
-  }, [fetchVodList, fetchUsers, fetchPremiumUsers, fetchBanners, fetchAccessSettings]);
+  }, [
+    fetchVodList,
+    fetchUsers,
+    fetchPremiumUsers,
+    fetchBanners,
+    fetchAccessSettings,
+  ]);
 
   // ─── VOD 핸들러 ───────────────────────────────────────────────────
   async function handleAdd(e: React.FormEvent) {
@@ -235,7 +281,12 @@ export default function AdminVodPage() {
       const res = await fetch('/api/admin/vod', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: addTitle, youtubeUrl: addUrl, description: addDesc, publishedAt: addPublishedAt || null }),
+        body: JSON.stringify({
+          title: addTitle,
+          youtubeUrl: addUrl,
+          description: addDesc,
+          publishedAt: addPublishedAt || null,
+        }),
       });
       if (res.ok) {
         setAddTitle('');
@@ -337,7 +388,10 @@ export default function AdminVodPage() {
       await fetch('/api/admin/vod', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, publishedAt: editingPublishedAtText || null }),
+        body: JSON.stringify({
+          id,
+          publishedAt: editingPublishedAtText || null,
+        }),
       });
       setEditingPublishedAtId(null);
       await fetchVodList();
@@ -518,7 +572,11 @@ export default function AdminVodPage() {
       const res = await fetch('/api/admin/premium-users', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, name: editingPremiumName, phoneNum: digits }),
+        body: JSON.stringify({
+          id,
+          name: editingPremiumName,
+          phoneNum: digits,
+        }),
       });
       if (res.ok) {
         setEditingPremiumId(null);
@@ -536,7 +594,9 @@ export default function AdminVodPage() {
     window.location.href = '/api/admin/premium-users/csv-template';
   }
 
-  async function handlePremiumCsvUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handlePremiumCsvUpload(
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -616,7 +676,10 @@ export default function AdminVodPage() {
       formData.append('position', bannerPosition);
       formData.append('isRandom', String(bannerIsRandom));
 
-      const res = await fetch('/api/admin/banners', { method: 'POST', body: formData });
+      const res = await fetch('/api/admin/banners', {
+        method: 'POST',
+        body: formData,
+      });
       if (res.ok) {
         setBannerLinkUrl('');
         setBannerPosition('both');
@@ -743,13 +806,17 @@ export default function AdminVodPage() {
     e.preventDefault();
     const code = newOptionCode.trim();
     if (!code || accessSettings.allowedOptionCodes.includes(code)) return;
-    saveAccessSettings({ allowedOptionCodes: [...accessSettings.allowedOptionCodes, code] });
+    saveAccessSettings({
+      allowedOptionCodes: [...accessSettings.allowedOptionCodes, code],
+    });
     setNewOptionCode('');
   }
 
   function handleRemoveOptionCode(code: string) {
     saveAccessSettings({
-      allowedOptionCodes: accessSettings.allowedOptionCodes.filter((c) => c !== code),
+      allowedOptionCodes: accessSettings.allowedOptionCodes.filter(
+        (c) => c !== code,
+      ),
     });
   }
 
@@ -760,7 +827,8 @@ export default function AdminVodPage() {
 
   const allSelected = users.length > 0 && selectedUserIds.size === users.length;
   const someSelected = selectedUserIds.size > 0;
-  const allPremiumSelected = premiumUsers.length > 0 && selectedPremiumIds.size === premiumUsers.length;
+  const allPremiumSelected =
+    premiumUsers.length > 0 && selectedPremiumIds.size === premiumUsers.length;
   const somePremiumSelected = selectedPremiumIds.size > 0;
 
   return (
@@ -768,7 +836,9 @@ export default function AdminVodPage() {
       <div className="max-w-3xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">VOD 관리</h1>
-          <Button variant="outline" onClick={handleLogout}>로그아웃</Button>
+          <Button variant="outline" onClick={handleLogout}>
+            로그아웃
+          </Button>
         </div>
 
         {error && (
@@ -831,7 +901,9 @@ export default function AdminVodPage() {
         {/* ── VOD 목록 ─────────────────────────────────────────────── */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">VOD 목록 ({vodList.length}개)</CardTitle>
+            <CardTitle className="text-lg">
+              VOD 목록 ({vodList.length}개)
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -841,7 +913,10 @@ export default function AdminVodPage() {
             ) : (
               <ul className="space-y-2">
                 {vodList.map((vod, index) => (
-                  <li key={vod.id} className={`flex items-center gap-3 p-3 rounded-lg border ${vod.embedEnabled ? 'bg-white' : 'bg-gray-100 opacity-60'}`}>
+                  <li
+                    key={vod.id}
+                    className={`flex items-center gap-3 p-3 rounded-lg border ${vod.embedEnabled ? 'bg-white' : 'bg-gray-100 opacity-60'}`}
+                  >
                     {/* 순서 이동 버튼 */}
                     <div className="flex flex-col gap-0.5 shrink-0">
                       <button
@@ -849,51 +924,96 @@ export default function AdminVodPage() {
                         onClick={() => handleMoveUp(index)}
                         disabled={index === 0}
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="m18 15-6-6-6 6" />
+                        </svg>
                       </button>
                       <button
                         className="w-7 h-7 flex items-center justify-center rounded-md border border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                         onClick={() => handleMoveDown(index)}
                         disabled={index === vodList.length - 1}
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="m6 9 6 6 6-6" />
+                        </svg>
                       </button>
                     </div>
 
                     {/* 순서 번호 */}
-                    <span className="text-xs font-mono text-gray-400 w-5 text-center shrink-0">{index + 1}</span>
+                    <span className="text-xs font-mono text-gray-400 w-5 text-center shrink-0">
+                      {index + 1}
+                    </span>
 
                     {/* 썸네일 + 정보 */}
-                    <AdminThumbnail youtubeId={vod.youtubeId} title={vod.title} />
+                    <AdminThumbnail
+                      youtubeId={vod.youtubeId}
+                      title={vod.title}
+                    />
                     <div className="flex-1 min-w-0">
                       {/* 제목 영역 */}
                       {editingTitleId === vod.id ? (
                         <div className="flex gap-1.5 items-center mb-0.5">
                           <input
                             value={editingTitleText}
-                            onChange={(e) => setEditingTitleText(e.target.value)}
+                            onChange={(e) =>
+                              setEditingTitleText(e.target.value)
+                            }
                             className="flex-1 rounded border border-gray-300 px-2 py-0.5 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-gray-900 min-w-0"
                             autoFocus
-                            onKeyDown={(e) => { if (e.key === 'Enter') handleSaveTitle(vod.id); if (e.key === 'Escape') setEditingTitleId(null); }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveTitle(vod.id);
+                              if (e.key === 'Escape') setEditingTitleId(null);
+                            }}
                           />
                           <button
                             className="text-xs px-2 py-1 rounded bg-gray-900 text-white hover:bg-gray-800 shrink-0"
                             onClick={() => handleSaveTitle(vod.id)}
-                          >저장</button>
+                          >
+                            저장
+                          </button>
                           <button
                             className="text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 shrink-0"
                             onClick={() => setEditingTitleId(null)}
-                          >취소</button>
+                          >
+                            취소
+                          </button>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2 mb-0.5">
                           <p
                             className="font-medium text-sm truncate cursor-pointer hover:text-blue-600"
-                            onClick={() => { setEditingTitleId(vod.id); setEditingTitleText(vod.title); }}
+                            onClick={() => {
+                              setEditingTitleId(vod.id);
+                              setEditingTitleText(vod.title);
+                            }}
                             title="클릭하여 제목 수정"
-                          >{vod.title}</p>
+                          >
+                            {vod.title}
+                          </p>
                           {!vod.embedEnabled && (
-                            <span className="text-xs bg-gray-300 text-gray-700 px-1.5 py-0.5 rounded shrink-0">비공개</span>
+                            <span className="text-xs bg-gray-300 text-gray-700 px-1.5 py-0.5 rounded shrink-0">
+                              비공개
+                            </span>
                           )}
                         </div>
                       )}
@@ -903,26 +1023,37 @@ export default function AdminVodPage() {
                           <input
                             type="date"
                             value={editingPublishedAtText}
-                            onChange={(e) => setEditingPublishedAtText(e.target.value)}
+                            onChange={(e) =>
+                              setEditingPublishedAtText(e.target.value)
+                            }
                             className="rounded border border-gray-300 px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-900"
                             autoFocus
                           />
                           <button
                             className="text-xs px-2 py-1 rounded bg-gray-900 text-white hover:bg-gray-800 shrink-0"
                             onClick={() => handleSavePublishedAt(vod.id)}
-                          >저장</button>
+                          >
+                            저장
+                          </button>
                           <button
                             className="text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 shrink-0"
                             onClick={() => setEditingPublishedAtId(null)}
-                          >취소</button>
+                          >
+                            취소
+                          </button>
                         </div>
                       ) : (
                         <p
                           className="text-xs text-gray-400 mt-0.5 cursor-pointer hover:text-gray-600"
-                          onClick={() => { setEditingPublishedAtId(vod.id); setEditingPublishedAtText(vod.publishedAt ?? ''); }}
+                          onClick={() => {
+                            setEditingPublishedAtId(vod.id);
+                            setEditingPublishedAtText(vod.publishedAt ?? '');
+                          }}
                           title="클릭하여 제작일 수정"
                         >
-                          {vod.publishedAt ? `제작일: ${vod.publishedAt}` : '제작일 추가...'}
+                          {vod.publishedAt
+                            ? `제작일: ${vod.publishedAt}`
+                            : '제작일 추가...'}
                         </p>
                       )}
 
@@ -939,16 +1070,23 @@ export default function AdminVodPage() {
                           <button
                             className="text-xs px-2 py-1 rounded bg-gray-900 text-white hover:bg-gray-800 shrink-0"
                             onClick={() => handleSaveDescription(vod.id)}
-                          >저장</button>
+                          >
+                            저장
+                          </button>
                           <button
                             className="text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 shrink-0"
                             onClick={() => setEditingDescId(null)}
-                          >취소</button>
+                          >
+                            취소
+                          </button>
                         </div>
                       ) : (
                         <p
                           className="text-xs text-gray-400 mt-0.5 cursor-pointer hover:text-gray-600 truncate"
-                          onClick={() => { setEditingDescId(vod.id); setEditingDescText(vod.description); }}
+                          onClick={() => {
+                            setEditingDescId(vod.id);
+                            setEditingDescText(vod.description);
+                          }}
                           title="클릭하여 설명 수정"
                         >
                           {vod.description || '설명 추가...'}
@@ -961,7 +1099,9 @@ export default function AdminVodPage() {
                       <Button
                         variant={vod.embedEnabled ? 'outline' : 'default'}
                         size="sm"
-                        onClick={() => handleToggleEmbed(vod.id, vod.embedEnabled)}
+                        onClick={() =>
+                          handleToggleEmbed(vod.id, vod.embedEnabled)
+                        }
                       >
                         {vod.embedEnabled ? '숨기기' : '공개'}
                       </Button>
@@ -969,7 +1109,9 @@ export default function AdminVodPage() {
                         variant="destructive"
                         size="sm"
                         onClick={() => setDeleteTarget(vod)}
-                      >삭제</Button>
+                      >
+                        삭제
+                      </Button>
                     </div>
                   </li>
                 ))}
@@ -986,7 +1128,9 @@ export default function AdminVodPage() {
           <CardContent className="space-y-4">
             {/* 배너 추가 폼 */}
             <div className="space-y-3 p-3 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-              <p className="text-sm font-medium text-gray-700">배너 추가 (1120×180 이미지)</p>
+              <p className="text-sm font-medium text-gray-700">
+                배너 추가 (1120×180 이미지)
+              </p>
               <div className="flex gap-2">
                 <Input
                   placeholder="클릭 시 이동할 URL (선택사항)"
@@ -1000,7 +1144,9 @@ export default function AdminVodPage() {
                 <label className="text-sm text-gray-600">표시 위치</label>
                 <select
                   value={bannerPosition}
-                  onChange={(e) => setBannerPosition(e.target.value as Banner['position'])}
+                  onChange={(e) =>
+                    setBannerPosition(e.target.value as Banner['position'])
+                  }
                   disabled={bannerAddLoading}
                   className="rounded-md border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
                 >
@@ -1051,7 +1197,10 @@ export default function AdminVodPage() {
             ) : (
               <ul className="space-y-2">
                 {banners.map((banner, index) => (
-                  <li key={banner.id} className="flex items-center gap-3 p-3 rounded-lg border bg-white">
+                  <li
+                    key={banner.id}
+                    className="flex items-center gap-3 p-3 rounded-lg border bg-white"
+                  >
                     {/* 순서 버튼 */}
                     <div className="flex flex-col gap-0.5 shrink-0">
                       <button
@@ -1059,14 +1208,38 @@ export default function AdminVodPage() {
                         onClick={() => handleBannerMoveUp(index)}
                         disabled={index === 0}
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="m18 15-6-6-6 6" />
+                        </svg>
                       </button>
                       <button
                         className="w-7 h-7 flex items-center justify-center rounded-md border border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
                         onClick={() => handleBannerMoveDown(index)}
                         disabled={index === banners.length - 1}
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="m6 9 6 6 6-6" />
+                        </svg>
                       </button>
                     </div>
                     {/* 썸네일 */}
@@ -1081,14 +1254,20 @@ export default function AdminVodPage() {
                         <input
                           placeholder="링크 URL (선택사항)"
                           value={editingBannerLinkUrl}
-                          onChange={(e) => setEditingBannerLinkUrl(e.target.value)}
+                          onChange={(e) =>
+                            setEditingBannerLinkUrl(e.target.value)
+                          }
                           className="w-full rounded border border-gray-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-gray-900"
                           autoFocus
                         />
                         <div className="flex items-center gap-2 flex-wrap">
                           <select
                             value={editingBannerPosition}
-                            onChange={(e) => setEditingBannerPosition(e.target.value as Banner['position'])}
+                            onChange={(e) =>
+                              setEditingBannerPosition(
+                                e.target.value as Banner['position'],
+                              )
+                            }
                             className="rounded border border-gray-300 px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-gray-900"
                           >
                             <option value="both">목록 + 재생화면</option>
@@ -1099,7 +1278,9 @@ export default function AdminVodPage() {
                             <input
                               type="checkbox"
                               checked={editingBannerIsRandom}
-                              onChange={(e) => setEditingBannerIsRandom(e.target.checked)}
+                              onChange={(e) =>
+                                setEditingBannerIsRandom(e.target.checked)
+                              }
                               className="rounded"
                             />
                             랜덤
@@ -1107,11 +1288,15 @@ export default function AdminVodPage() {
                           <button
                             className="text-xs px-2 py-1 rounded bg-gray-900 text-white hover:bg-gray-800 shrink-0"
                             onClick={() => handleSaveBanner(banner.id)}
-                          >저장</button>
+                          >
+                            저장
+                          </button>
                           <button
                             className="text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 shrink-0"
                             onClick={() => setEditingBannerId(null)}
-                          >취소</button>
+                          >
+                            취소
+                          </button>
                         </div>
                       </div>
                     ) : (
@@ -1120,9 +1305,15 @@ export default function AdminVodPage() {
                         onClick={() => startEditingBanner(banner)}
                         title="클릭하여 배너 정보 수정"
                       >
-                        <p className="truncate">{banner.linkUrl || '링크 없음'}</p>
+                        <p className="truncate">
+                          {banner.linkUrl || '링크 없음'}
+                        </p>
                         <p>
-                          {banner.position === 'list' ? '목록 상단' : banner.position === 'player' ? '재생화면 하단' : '둘 다'}
+                          {banner.position === 'list'
+                            ? '목록 상단'
+                            : banner.position === 'player'
+                              ? '재생화면 하단'
+                              : '둘 다'}
                           {banner.isRandom && ' · 랜덤'}
                         </p>
                       </div>
@@ -1132,7 +1323,9 @@ export default function AdminVodPage() {
                       size="sm"
                       onClick={() => handleDeleteBanner(banner.id)}
                       className="shrink-0"
-                    >삭제</Button>
+                    >
+                      삭제
+                    </Button>
                   </li>
                 ))}
               </ul>
@@ -1143,7 +1336,9 @@ export default function AdminVodPage() {
         {/* ── 챌린지 참여/옵션 필터 설정(LC-3208) ─────────────────────── */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">챌린지 참여/옵션 필터 설정</CardTitle>
+            <CardTitle className="text-lg">
+              챌린지 참여/옵션 필터 설정
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {accessSettingsLoading ? (
@@ -1158,8 +1353,12 @@ export default function AdminVodPage() {
 
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm font-medium text-gray-900">챌린지 참여 필수</p>
-                    <p className="text-xs text-gray-500">켜면 활성 챌린지 참여자가 아닌 사람은 통과하지 못한다.</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      챌린지 참여 필수
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      켜면 활성 챌린지 참여자가 아닌 사람은 통과하지 못한다.
+                    </p>
                   </div>
                   <Switch
                     checked={accessSettings.requireChallengeParticipation}
@@ -1171,8 +1370,13 @@ export default function AdminVodPage() {
 
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm font-medium text-gray-900">옵션 필수</p>
-                    <p className="text-xs text-gray-500">켜면 아래 허용 옵션 코드를 하나도 갖지 않은 사람은 통과하지 못한다.</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      옵션 필수
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      켜면 아래 허용 옵션 코드를 하나도 갖지 않은 사람은
+                      통과하지 못한다.
+                    </p>
                   </div>
                   <Switch
                     checked={accessSettings.requireChallengeOption}
@@ -1183,8 +1387,12 @@ export default function AdminVodPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-900">허용 옵션 코드</p>
-                  <p className="text-xs text-gray-500">챌린지 개설 화면의 옵션 코드(예: WFB1, PLUS1)를 등록한다.</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    허용 옵션 코드
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    챌린지 개설 화면의 옵션 코드(예: WFB1, PLUS1)를 등록한다.
+                  </p>
                   <form onSubmit={handleAddOptionCode} className="flex gap-2">
                     <Input
                       placeholder="옵션 코드 (예: WFB1)"
@@ -1193,12 +1401,18 @@ export default function AdminVodPage() {
                       disabled={accessSettingsSaving}
                       className="flex-1"
                     />
-                    <Button type="submit" size="sm" disabled={accessSettingsSaving || !newOptionCode.trim()}>
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={accessSettingsSaving || !newOptionCode.trim()}
+                    >
                       추가
                     </Button>
                   </form>
                   {accessSettings.allowedOptionCodes.length === 0 ? (
-                    <p className="text-sm text-gray-500">등록된 옵션 코드가 없습니다.</p>
+                    <p className="text-sm text-gray-500">
+                      등록된 옵션 코드가 없습니다.
+                    </p>
                   ) : (
                     <ul className="flex flex-wrap gap-2">
                       {accessSettings.allowedOptionCodes.map((code) => (
@@ -1246,12 +1460,18 @@ export default function AdminVodPage() {
                 <Input
                   placeholder="01012345678"
                   value={userPhone}
-                  onChange={(e) => setUserPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                  onChange={(e) =>
+                    setUserPhone(e.target.value.replace(/\D/g, '').slice(0, 11))
+                  }
                   disabled={userAddLoading}
                   required
                   className="flex-1"
                 />
-                <Button type="submit" disabled={userAddLoading} className="shrink-0">
+                <Button
+                  type="submit"
+                  disabled={userAddLoading}
+                  className="shrink-0"
+                >
                   {userAddLoading ? '추가 중...' : '추가'}
                 </Button>
               </div>
@@ -1294,7 +1514,8 @@ export default function AdminVodPage() {
             {csvResult && (
               <div className="text-sm p-3 bg-green-50 border border-green-200 rounded-lg">
                 <p className="font-medium text-green-800">
-                  업로드 완료: {csvResult.added}명 추가, {csvResult.skipped}명 스킵
+                  업로드 완료: {csvResult.added}명 추가, {csvResult.skipped}명
+                  스킵
                 </p>
                 {csvResult.errors.length > 0 && (
                   <ul className="mt-1 text-green-700 text-xs space-y-0.5">
@@ -1316,7 +1537,9 @@ export default function AdminVodPage() {
             {usersLoading ? (
               <p className="text-sm text-gray-500">불러오는 중...</p>
             ) : users.length === 0 ? (
-              <p className="text-sm text-gray-500">등록된 예외 유저가 없습니다.</p>
+              <p className="text-sm text-gray-500">
+                등록된 예외 유저가 없습니다.
+              </p>
             ) : (
               <div className="space-y-2">
                 {/* 일괄 삭제 툴바 */}
@@ -1349,9 +1572,15 @@ export default function AdminVodPage() {
                             className="rounded"
                           />
                         </th>
-                        <th className="p-2 text-left font-medium text-gray-600">이름</th>
-                        <th className="p-2 text-left font-medium text-gray-600">전화번호</th>
-                        <th className="p-2 text-left font-medium text-gray-600">등록일</th>
+                        <th className="p-2 text-left font-medium text-gray-600">
+                          이름
+                        </th>
+                        <th className="p-2 text-left font-medium text-gray-600">
+                          전화번호
+                        </th>
+                        <th className="p-2 text-left font-medium text-gray-600">
+                          등록일
+                        </th>
                         <th className="w-16 p-2"></th>
                       </tr>
                     </thead>
@@ -1374,7 +1603,9 @@ export default function AdminVodPage() {
                               <td className="p-1">
                                 <input
                                   value={editingUserName}
-                                  onChange={(e) => setEditingUserName(e.target.value)}
+                                  onChange={(e) =>
+                                    setEditingUserName(e.target.value)
+                                  }
                                   className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
                                   autoFocus
                                 />
@@ -1382,24 +1613,34 @@ export default function AdminVodPage() {
                               <td className="p-1">
                                 <input
                                   value={editingUserPhone}
-                                  onChange={(e) => setEditingUserPhone(formatPhoneNum(e.target.value))}
+                                  onChange={(e) =>
+                                    setEditingUserPhone(
+                                      formatPhoneNum(e.target.value),
+                                    )
+                                  }
                                   placeholder="01012345678"
                                   className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
                                 />
                               </td>
                               <td className="p-2 text-gray-400 text-xs">
-                                {new Date(user.createdAt).toLocaleDateString('ko-KR')}
+                                {new Date(user.createdAt).toLocaleDateString(
+                                  'ko-KR',
+                                )}
                               </td>
                               <td className="p-1">
                                 <div className="flex gap-1">
                                   <button
                                     className="text-xs px-2 py-1 rounded bg-gray-900 text-white hover:bg-gray-800"
                                     onClick={() => handleSaveUser(user.id)}
-                                  >저장</button>
+                                  >
+                                    저장
+                                  </button>
                                   <button
                                     className="text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
                                     onClick={() => setEditingUserId(null)}
-                                  >취소</button>
+                                  >
+                                    취소
+                                  </button>
                                 </div>
                               </td>
                             </>
@@ -1407,16 +1648,30 @@ export default function AdminVodPage() {
                             <>
                               <td
                                 className="p-2 font-medium cursor-pointer hover:text-blue-600"
-                                onClick={() => { setEditingUserId(user.id); setEditingUserName(user.name); setEditingUserPhone(user.phoneNum); }}
+                                onClick={() => {
+                                  setEditingUserId(user.id);
+                                  setEditingUserName(user.name);
+                                  setEditingUserPhone(user.phoneNum);
+                                }}
                                 title="클릭하여 수정"
-                              >{user.name}</td>
+                              >
+                                {user.name}
+                              </td>
                               <td
                                 className="p-2 text-gray-600 cursor-pointer hover:text-blue-600"
-                                onClick={() => { setEditingUserId(user.id); setEditingUserName(user.name); setEditingUserPhone(user.phoneNum); }}
+                                onClick={() => {
+                                  setEditingUserId(user.id);
+                                  setEditingUserName(user.name);
+                                  setEditingUserPhone(user.phoneNum);
+                                }}
                                 title="클릭하여 수정"
-                              >{user.phoneNum}</td>
+                              >
+                                {user.phoneNum}
+                              </td>
                               <td className="p-2 text-gray-400 text-xs">
-                                {new Date(user.createdAt).toLocaleDateString('ko-KR')}
+                                {new Date(user.createdAt).toLocaleDateString(
+                                  'ko-KR',
+                                )}
                               </td>
                               <td className="p-2">
                                 <Button
@@ -1460,12 +1715,20 @@ export default function AdminVodPage() {
                 <Input
                   placeholder="01012345678"
                   value={premiumPhone}
-                  onChange={(e) => setPremiumPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                  onChange={(e) =>
+                    setPremiumPhone(
+                      e.target.value.replace(/\D/g, '').slice(0, 11),
+                    )
+                  }
                   disabled={premiumAddLoading}
                   required
                   className="flex-1"
                 />
-                <Button type="submit" disabled={premiumAddLoading} className="shrink-0">
+                <Button
+                  type="submit"
+                  disabled={premiumAddLoading}
+                  className="shrink-0"
+                >
                   {premiumAddLoading ? '추가 중...' : '추가'}
                 </Button>
               </div>
@@ -1508,7 +1771,8 @@ export default function AdminVodPage() {
             {premiumCsvResult && (
               <div className="text-sm p-3 bg-green-50 border border-green-200 rounded-lg">
                 <p className="font-medium text-green-800">
-                  업로드 완료: {premiumCsvResult.added}명 추가, {premiumCsvResult.skipped}명 스킵
+                  업로드 완료: {premiumCsvResult.added}명 추가,{' '}
+                  {premiumCsvResult.skipped}명 스킵
                 </p>
                 {premiumCsvResult.errors.length > 0 && (
                   <ul className="mt-1 text-green-700 text-xs space-y-0.5">
@@ -1530,7 +1794,9 @@ export default function AdminVodPage() {
             {premiumLoading ? (
               <p className="text-sm text-gray-500">불러오는 중...</p>
             ) : premiumUsers.length === 0 ? (
-              <p className="text-sm text-gray-500">등록된 프리미엄 유저가 없습니다.</p>
+              <p className="text-sm text-gray-500">
+                등록된 프리미엄 유저가 없습니다.
+              </p>
             ) : (
               <div className="space-y-2">
                 {/* 일괄 삭제 툴바 */}
@@ -1563,9 +1829,15 @@ export default function AdminVodPage() {
                             className="rounded"
                           />
                         </th>
-                        <th className="p-2 text-left font-medium text-gray-600">이름</th>
-                        <th className="p-2 text-left font-medium text-gray-600">전화번호</th>
-                        <th className="p-2 text-left font-medium text-gray-600">등록일</th>
+                        <th className="p-2 text-left font-medium text-gray-600">
+                          이름
+                        </th>
+                        <th className="p-2 text-left font-medium text-gray-600">
+                          전화번호
+                        </th>
+                        <th className="p-2 text-left font-medium text-gray-600">
+                          등록일
+                        </th>
                         <th className="w-16 p-2"></th>
                       </tr>
                     </thead>
@@ -1588,7 +1860,9 @@ export default function AdminVodPage() {
                               <td className="p-1">
                                 <input
                                   value={editingPremiumName}
-                                  onChange={(e) => setEditingPremiumName(e.target.value)}
+                                  onChange={(e) =>
+                                    setEditingPremiumName(e.target.value)
+                                  }
                                   className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
                                   autoFocus
                                 />
@@ -1596,24 +1870,34 @@ export default function AdminVodPage() {
                               <td className="p-1">
                                 <input
                                   value={editingPremiumPhone}
-                                  onChange={(e) => setEditingPremiumPhone(formatPhoneNum(e.target.value))}
+                                  onChange={(e) =>
+                                    setEditingPremiumPhone(
+                                      formatPhoneNum(e.target.value),
+                                    )
+                                  }
                                   placeholder="01012345678"
                                   className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
                                 />
                               </td>
                               <td className="p-2 text-gray-400 text-xs">
-                                {new Date(user.createdAt).toLocaleDateString('ko-KR')}
+                                {new Date(user.createdAt).toLocaleDateString(
+                                  'ko-KR',
+                                )}
                               </td>
                               <td className="p-1">
                                 <div className="flex gap-1">
                                   <button
                                     className="text-xs px-2 py-1 rounded bg-gray-900 text-white hover:bg-gray-800"
                                     onClick={() => handleSavePremium(user.id)}
-                                  >저장</button>
+                                  >
+                                    저장
+                                  </button>
                                   <button
                                     className="text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
                                     onClick={() => setEditingPremiumId(null)}
-                                  >취소</button>
+                                  >
+                                    취소
+                                  </button>
                                 </div>
                               </td>
                             </>
@@ -1621,16 +1905,30 @@ export default function AdminVodPage() {
                             <>
                               <td
                                 className="p-2 font-medium cursor-pointer hover:text-blue-600"
-                                onClick={() => { setEditingPremiumId(user.id); setEditingPremiumName(user.name); setEditingPremiumPhone(user.phoneNum); }}
+                                onClick={() => {
+                                  setEditingPremiumId(user.id);
+                                  setEditingPremiumName(user.name);
+                                  setEditingPremiumPhone(user.phoneNum);
+                                }}
                                 title="클릭하여 수정"
-                              >{user.name}</td>
+                              >
+                                {user.name}
+                              </td>
                               <td
                                 className="p-2 text-gray-600 cursor-pointer hover:text-blue-600"
-                                onClick={() => { setEditingPremiumId(user.id); setEditingPremiumName(user.name); setEditingPremiumPhone(user.phoneNum); }}
+                                onClick={() => {
+                                  setEditingPremiumId(user.id);
+                                  setEditingPremiumName(user.name);
+                                  setEditingPremiumPhone(user.phoneNum);
+                                }}
                                 title="클릭하여 수정"
-                              >{user.phoneNum}</td>
+                              >
+                                {user.phoneNum}
+                              </td>
                               <td className="p-2 text-gray-400 text-xs">
-                                {new Date(user.createdAt).toLocaleDateString('ko-KR')}
+                                {new Date(user.createdAt).toLocaleDateString(
+                                  'ko-KR',
+                                )}
                               </td>
                               <td className="p-2">
                                 <Button
@@ -1661,13 +1959,18 @@ export default function AdminVodPage() {
           <DialogHeader>
             <DialogTitle>VOD 삭제</DialogTitle>
             <DialogDescription>
-              &quot;{deleteTarget?.title}&quot;을(를) 삭제하시겠습니까?
-              삭제 후 유저에게 영상이 비공개 처리됩니다.
+              &quot;{deleteTarget?.title}&quot;을(를) 삭제하시겠습니까? 삭제 후
+              유저에게 영상이 비공개 처리됩니다.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>취소</Button>
-            <Button variant="destructive" onClick={() => deleteTarget && handleDelete(deleteTarget.id)}>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              취소
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteTarget && handleDelete(deleteTarget.id)}
+            >
               삭제
             </Button>
           </DialogFooter>
@@ -1675,17 +1978,28 @@ export default function AdminVodPage() {
       </Dialog>
 
       {/* 유저 삭제 확인 다이얼로그 */}
-      <Dialog open={!!deleteUserTarget} onOpenChange={() => setDeleteUserTarget(null)}>
+      <Dialog
+        open={!!deleteUserTarget}
+        onOpenChange={() => setDeleteUserTarget(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>예외 유저 삭제</DialogTitle>
             <DialogDescription>
-              &quot;{deleteUserTarget?.name}&quot; ({deleteUserTarget?.phoneNum})을(를) 삭제하시겠습니까?
+              &quot;{deleteUserTarget?.name}&quot; ({deleteUserTarget?.phoneNum}
+              )을(를) 삭제하시겠습니까?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteUserTarget(null)}>취소</Button>
-            <Button variant="destructive" onClick={() => deleteUserTarget && handleDeleteUser(deleteUserTarget.id)}>
+            <Button variant="outline" onClick={() => setDeleteUserTarget(null)}>
+              취소
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() =>
+                deleteUserTarget && handleDeleteUser(deleteUserTarget.id)
+              }
+            >
               삭제
             </Button>
           </DialogFooter>
@@ -1693,17 +2007,32 @@ export default function AdminVodPage() {
       </Dialog>
 
       {/* 프리미엄 유저 삭제 확인 다이얼로그 */}
-      <Dialog open={!!deletePremiumTarget} onOpenChange={() => setDeletePremiumTarget(null)}>
+      <Dialog
+        open={!!deletePremiumTarget}
+        onOpenChange={() => setDeletePremiumTarget(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>프리미엄 유저 삭제</DialogTitle>
             <DialogDescription>
-              &quot;{deletePremiumTarget?.name}&quot; ({deletePremiumTarget?.phoneNum})을(를) 삭제하시겠습니까?
+              &quot;{deletePremiumTarget?.name}&quot; (
+              {deletePremiumTarget?.phoneNum})을(를) 삭제하시겠습니까?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeletePremiumTarget(null)}>취소</Button>
-            <Button variant="destructive" onClick={() => deletePremiumTarget && handleDeletePremium(deletePremiumTarget.id)}>
+            <Button
+              variant="outline"
+              onClick={() => setDeletePremiumTarget(null)}
+            >
+              취소
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() =>
+                deletePremiumTarget &&
+                handleDeletePremium(deletePremiumTarget.id)
+              }
+            >
               삭제
             </Button>
           </DialogFooter>

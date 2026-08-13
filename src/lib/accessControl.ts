@@ -11,7 +11,7 @@ import { AccessSettings } from './types';
 export function isEligibleForAccess(
   settings: AccessSettings,
   isActiveChallengeParticipant: boolean,
-  optionCodes: string[]
+  optionCodes: string[],
 ): boolean {
   if (settings.requireChallengeParticipation && !isActiveChallengeParticipant) {
     return false;
@@ -19,7 +19,7 @@ export function isEligibleForAccess(
 
   if (settings.requireChallengeOption) {
     const hasAllowedOption = settings.allowedOptionCodes.some((code) =>
-      optionCodes.includes(code)
+      optionCodes.includes(code),
     );
     if (!hasAllowedOption) return false;
   }

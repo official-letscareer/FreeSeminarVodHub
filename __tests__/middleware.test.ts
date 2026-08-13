@@ -2,7 +2,10 @@ import { middleware } from '@/middleware';
 import { NextRequest } from 'next/server';
 import { SSO_ACCESS_TOKEN_COOKIE } from '@/lib/sso';
 
-function makeRequest(path: string, cookies: Record<string, string> = {}): NextRequest {
+function makeRequest(
+  path: string,
+  cookies: Record<string, string> = {},
+): NextRequest {
   const req = new NextRequest(`http://localhost${path}`);
   for (const [name, value] of Object.entries(cookies)) {
     req.cookies.set(name, value);

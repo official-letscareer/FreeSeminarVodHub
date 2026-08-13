@@ -1,5 +1,11 @@
 import { supabase } from './supabase';
-import { VodItem, AllowedUser, PremiumUser, Banner, AccessSettings } from './types';
+import {
+  VodItem,
+  AllowedUser,
+  PremiumUser,
+  Banner,
+  AccessSettings,
+} from './types';
 
 function getSupabase() {
   if (!supabase) throw new Error('Supabase가 설정되지 않았습니다.');
@@ -52,7 +58,7 @@ export async function getEnabledVodList(): Promise<VodItem[]> {
 }
 
 export async function addVod(
-  data: Pick<VodItem, 'title' | 'youtubeId' | 'description' | 'publishedAt'>
+  data: Pick<VodItem, 'title' | 'youtubeId' | 'description' | 'publishedAt'>,
 ): Promise<VodItem> {
   const { data: maxRow } = await getSupabase()
     .from('vods')
@@ -80,7 +86,10 @@ export async function addVod(
   return toVodItem(inserted);
 }
 
-export async function updateVodDescription(id: number, description: string): Promise<void> {
+export async function updateVodDescription(
+  id: number,
+  description: string,
+): Promise<void> {
   const { error } = await getSupabase()
     .from('vods')
     .update({ description })
@@ -90,7 +99,7 @@ export async function updateVodDescription(id: number, description: string): Pro
 
 export async function updateVodMeta(
   id: number,
-  meta: { title?: string; description?: string; publishedAt?: string | null }
+  meta: { title?: string; description?: string; publishedAt?: string | null },
 ): Promise<void> {
   const updates: Record<string, unknown> = {};
   if (meta.title !== undefined) updates.title = meta.title;
@@ -98,7 +107,10 @@ export async function updateVodMeta(
   if ('publishedAt' in meta) updates.published_at = meta.publishedAt ?? null;
 
   if (Object.keys(updates).length === 0) return;
-  const { error } = await getSupabase().from('vods').update(updates).eq('id', id);
+  const { error } = await getSupabase()
+    .from('vods')
+    .update(updates)
+    .eq('id', id);
   if (error) throw error;
 }
 
@@ -126,7 +138,10 @@ export async function updateVodOrder(orderedIds: number[]): Promise<VodItem[]> {
   return getVodList();
 }
 
-export async function toggleVodEmbed(id: number, enabled: boolean): Promise<void> {
+export async function toggleVodEmbed(
+  id: number,
+  enabled: boolean,
+): Promise<void> {
   const { error } = await getSupabase()
     .from('vods')
     .update({ embed_enabled: enabled })
@@ -147,7 +162,7 @@ export async function getAllowedUsers(): Promise<AllowedUser[]> {
 
 export async function addAllowedUser(
   name: string,
-  phoneNum: string
+  phoneNum: string,
 ): Promise<AllowedUser> {
   const { data, error } = await getSupabase()
     .from('allowed_users')
@@ -160,31 +175,40 @@ export async function addAllowedUser(
 }
 
 export async function deleteAllowedUser(id: number): Promise<void> {
-  const { error } = await getSupabase().from('allowed_users').delete().eq('id', id);
+  const { error } = await getSupabase()
+    .from('allowed_users')
+    .delete()
+    .eq('id', id);
   if (error) throw error;
 }
 
 export async function deleteAllowedUsers(ids: number[]): Promise<void> {
   if (ids.length === 0) return;
-  const { error } = await getSupabase().from('allowed_users').delete().in('id', ids);
+  const { error } = await getSupabase()
+    .from('allowed_users')
+    .delete()
+    .in('id', ids);
   if (error) throw error;
 }
 
 export async function updateAllowedUser(
   id: number,
-  data: { name?: string; phoneNum?: string }
+  data: { name?: string; phoneNum?: string },
 ): Promise<void> {
   const updates: Record<string, unknown> = {};
   if (data.name !== undefined) updates.name = data.name;
   if (data.phoneNum !== undefined) updates.phone_num = data.phoneNum;
   if (Object.keys(updates).length === 0) return;
-  const { error } = await getSupabase().from('allowed_users').update(updates).eq('id', id);
+  const { error } = await getSupabase()
+    .from('allowed_users')
+    .update(updates)
+    .eq('id', id);
   if (error) throw error;
 }
 
 export async function isAllowedUser(
   name: string,
-  phoneNum: string
+  phoneNum: string,
 ): Promise<boolean> {
   const { data, error } = await getSupabase()
     .from('allowed_users')
@@ -219,7 +243,7 @@ export async function getPremiumUsers(): Promise<PremiumUser[]> {
 
 export async function addPremiumUser(
   name: string,
-  phoneNum: string
+  phoneNum: string,
 ): Promise<PremiumUser> {
   const { data, error } = await getSupabase()
     .from('premium_users')
@@ -232,31 +256,40 @@ export async function addPremiumUser(
 }
 
 export async function deletePremiumUser(id: number): Promise<void> {
-  const { error } = await getSupabase().from('premium_users').delete().eq('id', id);
+  const { error } = await getSupabase()
+    .from('premium_users')
+    .delete()
+    .eq('id', id);
   if (error) throw error;
 }
 
 export async function deletePremiumUsers(ids: number[]): Promise<void> {
   if (ids.length === 0) return;
-  const { error } = await getSupabase().from('premium_users').delete().in('id', ids);
+  const { error } = await getSupabase()
+    .from('premium_users')
+    .delete()
+    .in('id', ids);
   if (error) throw error;
 }
 
 export async function updatePremiumUser(
   id: number,
-  data: { name?: string; phoneNum?: string }
+  data: { name?: string; phoneNum?: string },
 ): Promise<void> {
   const updates: Record<string, unknown> = {};
   if (data.name !== undefined) updates.name = data.name;
   if (data.phoneNum !== undefined) updates.phone_num = data.phoneNum;
   if (Object.keys(updates).length === 0) return;
-  const { error } = await getSupabase().from('premium_users').update(updates).eq('id', id);
+  const { error } = await getSupabase()
+    .from('premium_users')
+    .update(updates)
+    .eq('id', id);
   if (error) throw error;
 }
 
 export async function isPremiumUser(
   name: string,
-  phoneNum: string
+  phoneNum: string,
 ): Promise<boolean> {
   const { data, error } = await getSupabase()
     .from('premium_users')
@@ -282,7 +315,9 @@ function toBanner(row: Record<string, unknown>): Banner {
   };
 }
 
-export async function getBanners(position?: Banner['position']): Promise<Banner[]> {
+export async function getBanners(
+  position?: Banner['position'],
+): Promise<Banner[]> {
   let query = getSupabase()
     .from('banners')
     .select('*')
@@ -343,7 +378,10 @@ export async function deleteBanner(id: number): Promise<void> {
     const url = data.image_url as string;
     const pathMatch = url.match(/\/banners\/(.+)$/);
     if (pathMatch) {
-      getSupabase().storage.from('banners').remove([pathMatch[1]]).then(() => {});
+      getSupabase()
+        .storage.from('banners')
+        .remove([pathMatch[1]])
+        .then(() => {});
     }
   }
 }
@@ -359,7 +397,7 @@ export async function updateBannerOrder(orderedIds: number[]): Promise<void> {
 
 export async function updateBannerMeta(
   id: number,
-  meta: { linkUrl?: string; position?: Banner['position']; isRandom?: boolean }
+  meta: { linkUrl?: string; position?: Banner['position']; isRandom?: boolean },
 ): Promise<void> {
   const updates: Record<string, unknown> = {};
   if (meta.linkUrl !== undefined) updates.link_url = meta.linkUrl;
@@ -367,7 +405,10 @@ export async function updateBannerMeta(
   if (meta.isRandom !== undefined) updates.is_random = meta.isRandom;
 
   if (Object.keys(updates).length === 0) return;
-  const { error } = await getSupabase().from('banners').update(updates).eq('id', id);
+  const { error } = await getSupabase()
+    .from('banners')
+    .update(updates)
+    .eq('id', id);
   if (error) throw error;
 }
 
@@ -375,7 +416,7 @@ export async function updateBannerMeta(
 export async function checkRateLimit(
   key: string,
   maxRequests: number,
-  windowSeconds: number
+  windowSeconds: number,
 ): Promise<{ allowed: boolean; remaining: number }> {
   const windowStart = new Date(Date.now() - windowSeconds * 1000).toISOString();
 
@@ -403,7 +444,10 @@ export async function checkRateLimit(
     .lt('created_at', windowStart)
     .then(() => {});
 
-  return { allowed, remaining: Math.max(0, maxRequests - currentCount - (allowed ? 1 : 0)) };
+  return {
+    allowed,
+    remaining: Math.max(0, maxRequests - currentCount - (allowed ? 1 : 0)),
+  };
 }
 
 // ─── 챌린지 참여자/옵션 필터 설정(LC-3208) ──────────────────────────────────
@@ -439,7 +483,7 @@ export async function getAccessSettings(): Promise<AccessSettings> {
 }
 
 export async function updateAccessSettings(
-  settings: Partial<AccessSettings>
+  settings: Partial<AccessSettings>,
 ): Promise<AccessSettings> {
   const { data: existing, error: selectError } = await getSupabase()
     .from('access_settings')
@@ -451,7 +495,8 @@ export async function updateAccessSettings(
 
   const updates: Record<string, unknown> = {};
   if (settings.requireChallengeParticipation !== undefined) {
-    updates.require_challenge_participation = settings.requireChallengeParticipation;
+    updates.require_challenge_participation =
+      settings.requireChallengeParticipation;
   }
   if (settings.requireChallengeOption !== undefined) {
     updates.require_challenge_option = settings.requireChallengeOption;

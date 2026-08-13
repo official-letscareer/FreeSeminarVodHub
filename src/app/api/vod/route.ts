@@ -6,7 +6,7 @@ import { checkVodAccess } from '@/lib/vodAccess';
 function unauthorized(clearSsoCookie: boolean): NextResponse {
   const response = NextResponse.json(
     { message: '인증이 필요합니다.' },
-    { status: 401 }
+    { status: 401 },
   );
   if (clearSsoCookie) {
     // 만료·위조된 SSO 토큰을 들고 있어도 이후 요청마다 렛커 서버에 다시 물어보지

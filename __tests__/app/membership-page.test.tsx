@@ -40,7 +40,9 @@ describe('MembershipLoginPage — VOD 로그인 진입점 (LC-3208)', () => {
   it('"멤버십 가입자 로그인" 클릭 시 SSO 로그인 페이지로 redirect_uri·service_name과 함께 이동한다', () => {
     render(<MembershipLoginPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: '멤버십 가입자 로그인' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: '멤버십 가입자 로그인' }),
+    );
 
     const expectedRedirectUri = `${window.location.origin}/auth/callback`;
     expect(navigateToMock).toHaveBeenCalledWith(
@@ -52,7 +54,9 @@ describe('MembershipLoginPage — VOD 로그인 진입점 (LC-3208)', () => {
     delete process.env.NEXT_PUBLIC_LETSCAREER_SSO_URL;
     render(<MembershipLoginPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: '멤버십 가입자 로그인' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: '멤버십 가입자 로그인' }),
+    );
 
     expect(
       screen.getByText('SSO 로그인이 아직 설정되지 않았습니다.'),
