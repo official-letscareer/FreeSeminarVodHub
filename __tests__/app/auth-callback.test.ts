@@ -43,4 +43,58 @@ describe('GET /auth/callback', () => {
     );
     expect(res.cookies.get(SSO_ACCESS_TOKEN_COOKIE)).toBeUndefined();
   });
+
+  describe('소셜 로그인(카카오/네이버) — result= JSON 포맷', () => {
+    it('result 안의 accessToken/refreshToken을 꺼내 쿠키를 설정한다', async () => {
+      const result = JSON.stringify({
+        accessToken: 'social.access.jwt',
+        refreshToken: 'social.refresh.jwt',
+        isNew: false,
+      });
+      const res = await GET(
+        makeRequest(`?result=${encodeURIComponent(result)}`),
+      );
+
+      expect(res.status).toBe(307);
+      expect(res.headers.get('location')).toBe('http://localhost/vod');
+      expect(res.cookies.get(SSO_ACCESS_TOKEN_COOKIE)?.value).toBe(
+        'social.access.jwt',
+      );
+      expect(res.cookies.get(SSO_REFRESH_TOKEN_COOKIE)?.value).toBe(
+        'social.refresh.jwt',
+      );
+    });
+
+    it('result가 JSON으로 파싱되지 않으면 에러 리다이렉트로 처리한다', async () => {
+      const res = await GET(makeRequest('?result=not-json'));
+
+      expect(res.headers.get('location')).toBe(
+        'http://localhost/login?error=sso_failed',
+      );
+    });
+
+    it('result에 accessToken이 없으면 에러 리다이렉트로 처리한다', async () => {
+      const result = JSON.stringify({ isNew: true });
+      const res = await GET(
+        makeRequest(`?result=${encodeURIComponent(result)}`),
+      );
+
+      expect(res.headers.get('location')).toBe(
+        'http://localhost/login?error=sso_failed',
+      );
+    });
+
+    it('token과 result가 둘 다 있으면 token을 우선한다', async () => {
+      const result = JSON.stringify({ accessToken: 'social.access.jwt' });
+      const res = await GET(
+        makeRequest(
+          `?token=email.access.jwt&result=${encodeURIComponent(result)}`,
+        ),
+      );
+
+      expect(res.cookies.get(SSO_ACCESS_TOKEN_COOKIE)?.value).toBe(
+        'email.access.jwt',
+      );
+    });
+  });
 });

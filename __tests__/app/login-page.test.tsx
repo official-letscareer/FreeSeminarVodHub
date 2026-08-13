@@ -56,7 +56,7 @@ describe('LoginPage — SSO 버튼 (LC-3208)', () => {
 
     const expectedRedirectUri = `${window.location.origin}/auth/callback`;
     expect(navigateToMock).toHaveBeenCalledWith(
-      `https://letscareer.co.kr/sso/login?redirect_uri=${encodeURIComponent(expectedRedirectUri)}`,
+      `https://letscareer.co.kr/sso/login?redirect_uri=${encodeURIComponent(expectedRedirectUri)}&service_name=VOD`,
     );
   });
 

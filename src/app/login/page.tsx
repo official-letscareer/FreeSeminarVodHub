@@ -42,7 +42,9 @@ export default function LoginPage() {
       return;
     }
     const redirectUri = `${window.location.origin}/auth/callback`;
-    navigateTo(`${ssoUrl}/sso/login?redirect_uri=${encodeURIComponent(redirectUri)}`);
+    navigateTo(
+      `${ssoUrl}/sso/login?redirect_uri=${encodeURIComponent(redirectUri)}&service_name=${encodeURIComponent('VOD')}`,
+    );
   }
 
   async function handleSubmit(e: React.FormEvent) {
