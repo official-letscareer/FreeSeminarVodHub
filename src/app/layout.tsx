@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "무료 세미나 VOD",
+  title: "세미나 VOD",
   description: "챌린지 참여자 전용 VOD 스트리밍 서비스",
 };
 

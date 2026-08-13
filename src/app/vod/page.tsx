@@ -56,7 +56,7 @@ export default function VodListPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <SiteHeader
-        left={<h1 className="truncate text-lg font-bold text-gray-900">무료 세미나 VOD</h1>}
+        left={<h1 className="truncate text-lg font-bold text-gray-900">세미나 VOD</h1>}
         right={
           <Button variant="ghost" size="sm" onClick={handleLogout}>
             로그아웃
