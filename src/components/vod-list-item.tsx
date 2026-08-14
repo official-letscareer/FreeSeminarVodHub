@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { VodItem } from '@/lib/types';
 
@@ -35,13 +36,13 @@ export default function VodListItem({ vod }: { vod: VodItem }) {
             </svg>
           </div>
         ) : (
-          <img
+          <Image
             src={imgSrc}
             alt={vod.title}
             onError={handleImgError}
-            loading="lazy"
-            decoding="async"
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+            fill
+            sizes="128px"
+            className="object-cover group-hover:scale-105 transition-transform duration-200"
           />
         )}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">

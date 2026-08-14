@@ -27,6 +27,15 @@ const nextConfig: NextConfig = {
             },
           ]
         : []),
+      /*
+        유튜브 썸네일. 원본은 `cache-control: public, max-age=7200` — 두 시간만 캐시되고
+        그 뒤엔 다시 받는다. 여기를 거치면 아래 minimumCacheTTL(하루) 이 적용되고
+        JPEG 이 WebP/AVIF 로도 바뀐다.
+
+        img.youtube.com 은 i.ytimg.com 으로 리다이렉트되므로 두 호스트를 모두 허용한다.
+      */
+      { protocol: 'https' as const, hostname: 'img.youtube.com', pathname: '/vi/**' },
+      { protocol: 'https' as const, hostname: 'i.ytimg.com', pathname: '/vi/**' },
     ],
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 60 * 60 * 24,
