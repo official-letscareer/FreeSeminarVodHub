@@ -37,10 +37,10 @@ export default function MembershipLoginClient() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-surface px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="font-title text-3xl font-semibold leading-tight tracking-tight text-gray-900">
             프리미엄 세미나 VOD
           </h1>
           <p className="mt-2 text-sm text-gray-600">
