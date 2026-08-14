@@ -1,10 +1,38 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import Image from 'next/image';
 import { Banner } from '@/lib/types';
 
 interface Props {
   position: 'list' | 'player';
+}
+
+/**
+ * 배너 이미지.
+ *
+ * 원본이 Supabase 버킷의 2MB PNG 라 그대로 내보내면 방문할 때마다 그만큼을 받는다.
+ * next/image 를 거치면 화면 폭에 맞게 줄이고 WebP/AVIF 로 바꾼 결과가 나간다 —
+ * 버킷 파일은 손대지 않는다.
+ *
+ * 보이는 모양은 그대로다. `fill` + `object-cover` 로 기존 `w-full object-cover` 와 같게
+ * 그리고, 비율(1120:180)은 바깥 상자가 잡는다. sizes 는 이 배너가 실제로 차지하는 폭
+ * (본문 max-w-5xl 안쪽, 좌우 패딩 제외)을 알려줘 필요 이상으로 큰 파일을 받지 않게 한다.
+ */
+function BannerImage({ src, priority }: { src: string; priority: boolean }) {
+  return (
+    <div className="relative w-full" style={{ aspectRatio: '1120 / 180' }}>
+      <Image
+        src={src}
+        alt="배너"
+        fill
+        sizes="(max-width: 1024px) 100vw, 992px"
+        className="object-cover"
+        draggable={false}
+        priority={priority}
+      />
+    </div>
+  );
 }
 
 export default function BannerCarousel({ position }: Props) {
@@ -48,23 +76,11 @@ export default function BannerCarousel({ position }: Props) {
           rel="noopener noreferrer"
           className="block cursor-pointer"
         >
-          <img
-            src={banner.imageUrl}
-            alt="배너"
-            className="w-full object-cover"
-            style={{ aspectRatio: '1120 / 180' }}
-            draggable={false}
-          />
+          <BannerImage src={banner.imageUrl} priority={current === 0} />
         </a>
       ) : (
         <div className="cursor-default">
-          <img
-            src={banner.imageUrl}
-            alt="배너"
-            className="w-full object-cover"
-            style={{ aspectRatio: '1120 / 180' }}
-            draggable={false}
-          />
+          <BannerImage src={banner.imageUrl} priority={current === 0} />
         </div>
       )}
 

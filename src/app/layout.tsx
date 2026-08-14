@@ -1,16 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
-
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL;
 const title = '세미나 VOD';
@@ -56,11 +45,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
-      </body>
+      <head>
+        {/*
+          Pretendard 는 유니코드 범위별로 쪼갠 동적 서브셋이라 한 페이지에서 여러 조각을
+          받는다. 미리 연결해두면 조각마다 DNS·TLS 를 새로 맺지 않는다.
+        */}
+        <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="" />
+      </head>
+      <body className="antialiased">{children}</body>
     </html>
   );
 }
