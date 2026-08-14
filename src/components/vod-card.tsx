@@ -45,10 +45,17 @@ export default function VodCard({ vod }: { vod: VodItem }) {
             </svg>
           </div>
         ) : (
+          /*
+            유튜브 썸네일은 개당 10KB 안팎이라 next/image 로 변환해도 얻는 게 거의 없다.
+            대신 화면 밖 카드까지 한꺼번에 받지 않도록 지연 로딩만 건다 — 상자가 이미
+            aspect-video 라 나중에 로드돼도 레이아웃이 밀리지 않는다.
+          */
           <img
             src={imgSrc}
             alt={vod.title}
             onError={handleImgError}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
           />
         )}
