@@ -8,6 +8,7 @@ import SiteHeader from '@/components/site-header';
 import VodCard from '@/components/vod-card';
 import VodListItem from '@/components/vod-list-item';
 import BannerCarousel from '@/components/banner-carousel';
+import PageBackdrop from '@/components/page-backdrop';
 import { VodItem } from '@/lib/types';
 
 type ViewMode = 'grid' | 'list';
@@ -57,11 +58,20 @@ export default function VodListPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    /* 배경은 아래 그러데이션 레이어가 담당한다. 여기에 bg-surface 를 겹치면 값이 거의 같아
+       그러데이션이 상쇄돼 보이지 않는다. */
+    <div className="relative min-h-screen">
+      <PageBackdrop />
+
       <SiteHeader
         left={
-          <h1 className="truncate text-lg font-bold text-gray-900">
-            세미나 VOD
+          /*
+            로그인 화면의 제목과 같은 디스플레이 서체를 쓴다 — 로그인 전후로 제품 이름이
+            같은 얼굴로 보여야 한 서비스로 읽힌다. 등록된 웨이트가 600 하나뿐이라
+            font-semibold 를 명시한다(다른 굵기를 주면 합성 볼드로 획이 뭉개진다).
+          */
+          <h1 className="font-title truncate text-xl font-semibold tracking-tight text-gray-900">
+            세미나 VOD 다시보기
           </h1>
         }
         right={
@@ -72,8 +82,12 @@ export default function VodListPage() {
       />
 
       {/* 헤더·본문과 같은 max-w-5xl 폭으로 맞춘다 — 예전엔 배너만 화면 끝까지
-          꽉 채워서 아래 영상 목록과 좌우 폭이 어긋나 보였다. */}
-      <div className="max-w-5xl mx-auto px-4 pt-4">
+          꽉 채워서 아래 영상 목록과 좌우 폭이 어긋나 보였다.
+
+          모바일(640px 미만)에서는 숨긴다. 좁은 화면에서는 배너가 첫 화면을 다 차지해
+          정작 보러 온 영상 목록이 스크롤 아래로 밀려난다. 기준은 이 페이지가 이미
+          쓰고 있는 sm(=목록이 2열로 바뀌는 지점)에 맞춘다. */}
+      <div className="hidden max-w-5xl mx-auto px-4 pt-4 sm:block">
         <BannerCarousel position="list" />
       </div>
       <main className="max-w-5xl mx-auto px-4 py-6">

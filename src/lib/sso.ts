@@ -9,6 +9,80 @@
 export const SSO_ACCESS_TOKEN_COOKIE = 'sso_access_token';
 export const SSO_REFRESH_TOKEN_COOKIE = 'sso_refresh_token';
 
+/** 팝업 창이 오프너에게 로그인 완료를 알릴 때 쓰는 메시지 타입. */
+export const SSO_POPUP_MESSAGE_TYPE = 'letscareer-sso:result';
+
+export interface SsoTokens {
+  accessToken: string;
+  refreshToken: string | null;
+}
+
+/**
+ * 렛커 SSO 로그인 페이지가 로그인 성공 후 돌려보내는 콜백 쿼리에서 토큰을 꺼낸다.
+ * 두 형태를 모두 받는다:
+ * - `?token=&refreshToken=` — 이메일/비밀번호 SSO(SsoAuthController, server Push 2)
+ * - `?result={"accessToken":...,"refreshToken":...}` — 카카오/네이버 소셜 로그인
+ *   (OAuth2AuthenticationSuccessHandler). 이 형식은 내부 web/admin/mentor 이 이미 쓰던
+ *   기존 포맷 그대로라, 소셜 로그인 쪽 서버 코드는 건드리지 않고 여기서 흡수한다.
+ *
+ * 전체 이동 콜백과 팝업 콜백이 이 함수를 공유한다. 한쪽에만 형식이 추가되면 소셜 로그인이
+ * 한쪽 경로에서만 되는 상태가 되므로 복사하지 않는다.
+ */
+export function extractSsoTokens(
+  searchParams: URLSearchParams,
+): SsoTokens | null {
+  const token = searchParams.get('token');
+  if (token) {
+    return { accessToken: token, refreshToken: searchParams.get('refreshToken') };
+  }
+
+  const result = searchParams.get('result');
+  if (result) {
+    try {
+      const parsed = JSON.parse(result) as {
+        accessToken?: string;
+        refreshToken?: string;
+      };
+      if (typeof parsed.accessToken === 'string') {
+        return {
+          accessToken: parsed.accessToken,
+          refreshToken: parsed.refreshToken ?? null,
+        };
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 콜백에서 받은 토큰을 쿠키에 심는다. 전체 이동 콜백과 팝업 콜백이 공유한다.
+ *
+ * 기존 auth_verified 쿠키(src/app/api/auth/verify/route.ts)와 동일한 옵션 —
+ * httpOnly로 XSS를 통한 토큰 탈취를 막는다. localStorage에 두면 이 방어가 깨진다.
+ *
+ * 쿠키는 창이 아니라 **오리진**에 저장되므로, 팝업에서 심어도 오프너 탭이 그대로 공유한다.
+ * 팝업 방식이 토큰을 창 사이로 넘기지 않아도 되는 이유다.
+ */
+export function setSsoTokenCookies(
+  response: { cookies: { set: (name: string, value: string, options: object) => void } },
+  tokens: SsoTokens,
+): void {
+  const options = {
+    httpOnly: true,
+    sameSite: 'lax' as const,
+    path: '/',
+    maxAge: 60 * 60 * 24 * 365,
+  };
+
+  response.cookies.set(SSO_ACCESS_TOKEN_COOKIE, tokens.accessToken, options);
+  if (tokens.refreshToken) {
+    response.cookies.set(SSO_REFRESH_TOKEN_COOKIE, tokens.refreshToken, options);
+  }
+}
+
 export interface SsoUserProfile {
   name: string;
   isActiveChallengeParticipant: boolean;
