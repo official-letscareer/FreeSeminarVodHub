@@ -201,16 +201,23 @@ export default function LoginPage() {
             설명은 한 줄로 조용히 둔다. 무엇을 입력해야 하는지는 아래 라벨이 이미 말한다.
           */}
           {/*
+            무엇이 들어 있는지를 먼저 말하고, 그 다음에 이름을 밝힌다. 설명을 제목 아래
+            작게 두면 정작 의미를 담은 문장이 곁다리로 밀린다 — 읽는 순서가 곧 위계다.
+
+            "누가 들어올 수 있는가"는 여기서 말하지 않는다. 못 들어오는 경우는 확인 버튼을
+            눌렀을 때 안내가 따로 나간다.
+          */}
+          <p className="text-sm leading-relaxed text-gray-500">
+            먼저 지나온 사람들의 취업 준비 기록
+          </p>
+          {/*
             font-semibold 를 명시해야 한다. 등록한 웨이트가 600 하나뿐이라 다른 굵기를
             지정하면 브라우저가 없는 굵기를 흉내 내는 합성 볼드를 얹어 획이 뭉개진다.
             text-balance 는 줄을 고르게 나눈다 — 없으면 "기" 한 글자가 둘째 줄에 홀로 남는다.
           */}
-          <h1 className="font-title text-4xl font-semibold leading-tight text-balance tracking-tight text-gray-900">
+          <h1 className="font-title mt-2 text-4xl font-semibold leading-tight text-balance tracking-tight text-gray-900">
             세미나 VOD 다시보기
           </h1>
-          <p className="mt-3 text-sm leading-relaxed text-gray-500">
-            챌린지 참여자에게 열려 있습니다
-          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
