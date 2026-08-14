@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { VodItem } from '@/lib/types';
 
@@ -46,17 +47,18 @@ export default function VodCard({ vod }: { vod: VodItem }) {
           </div>
         ) : (
           /*
-            유튜브 썸네일은 개당 10KB 안팎이라 next/image 로 변환해도 얻는 게 거의 없다.
-            대신 화면 밖 카드까지 한꺼번에 받지 않도록 지연 로딩만 건다 — 상자가 이미
-            aspect-video 라 나중에 로드돼도 레이아웃이 밀리지 않는다.
+            유튜브 썸네일 원본은 두 시간(max-age=7200)만 캐시된다. next/image 를 거치면
+            next.config 의 minimumCacheTTL(하루)이 적용되고 WebP/AVIF 로도 바뀐다.
+            sizes 는 카드가 실제로 차지하는 폭(1열/2열/3열)을 알려줘 필요 이상 큰 파일을
+            받지 않게 한다.
           */
-          <img
+          <Image
             src={imgSrc}
             alt={vod.title}
             onError={handleImgError}
-            loading="lazy"
-            decoding="async"
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 320px"
+            className="object-cover group-hover:scale-105 transition-transform duration-200"
           />
         )}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
