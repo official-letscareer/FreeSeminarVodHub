@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { logUsage } from '@/lib/usageLog';
 
 /** `/api/vod` 계열이 403 `VOD_PASS_INACTIVE` 로 내려주는 활성화 대상 정보(LC-3438). */
 export interface InactivePassInfo {
@@ -82,6 +83,11 @@ export default function VodPassActivationDialog({
   const [pending, setPending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // 이 컴포넌트는 열려 있는 동안만 렌더되므로, 마운트가 곧 모달이 열린 순간이다.
+  useEffect(() => {
+    logUsage({ type: 'pass_prompt_shown' });
+  }, []);
+
   async function handleActivate() {
     setPending(true);
     setErrorMessage('');
@@ -94,11 +100,16 @@ export default function VodPassActivationDialog({
       });
 
       if (res.ok) {
+        logUsage({ type: 'pass_activated' });
         // 성공하면 호출한 화면이 이 모달을 내린다. 그 전까지 버튼은 잠가 둔다.
         onActivated();
         return;
       }
 
+      logUsage({
+        type: 'pass_activate_failed',
+        detail: { status: res.status },
+      });
       // 409(기간 충돌·환불 확인 중·취소됨)의 사유는 렛커 서버 메시지에 있다.
       const body: unknown = await res.json().catch(() => null);
       const message = (body as { message?: unknown } | null)?.message;
@@ -106,6 +117,8 @@ export default function VodPassActivationDialog({
         typeof message === 'string' && message ? message : FALLBACK_ERROR,
       );
     } catch {
+      // 응답을 받지 못한 실패(네트워크 오류)는 HTTP 상태가 없어 0 으로 남긴다.
+      logUsage({ type: 'pass_activate_failed', detail: { status: 0 } });
       setErrorMessage(FALLBACK_ERROR);
     }
     setPending(false);

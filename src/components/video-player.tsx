@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import CustomControls from './custom-controls';
+import { useVideoUsageLog } from '@/lib/useVideoUsageLog';
 
 // ─── YouTube IFrame API 최소 타입 선언 ────────────────────────────────────────
 interface YTPlayer {
@@ -36,7 +37,14 @@ declare global {
 const YT_PLAYING = 1;
 
 // ─── 컴포넌트 ──────────────────────────────────────────────────────────────────
-export default function VideoPlayer({ youtubeId }: { youtubeId: string }) {
+export default function VideoPlayer({
+  youtubeId,
+  vodId,
+}: {
+  youtubeId: string;
+  /** 이용 로그(LC-3438)에 싣는 vods.id */
+  vodId?: number;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const divRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YTPlayer | null>(null);
@@ -48,6 +56,15 @@ export default function VideoPlayer({ youtubeId }: { youtubeId: string }) {
   const [duration, setDuration] = useState(0);
   const [speed, setSpeed] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // 플레이어 초기화 효과보다 앞에 둔다. 언마운트 때 플레이어가 파괴되기 전에 마지막 위치를 읽어야 한다.
+  const { logReady, logState, logSkip, logScrub, logRate, logFullscreen } =
+    useVideoUsageLog({
+      vodId,
+      youtubeId,
+      readPosition: () => playerRef.current?.getCurrentTime(),
+      readDuration: () => playerRef.current?.getDuration(),
+    });
 
   const startTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -67,10 +84,11 @@ export default function VideoPlayer({ youtubeId }: { youtubeId: string }) {
   useEffect(() => {
     function onFsChange() {
       setIsFullscreen(!!document.fullscreenElement);
+      logFullscreen(!!document.fullscreenElement);
     }
     document.addEventListener('fullscreenchange', onFsChange);
     return () => document.removeEventListener('fullscreenchange', onFsChange);
-  }, []);
+  }, [logFullscreen]);
 
   useEffect(() => {
     let destroyed = false;
@@ -92,6 +110,7 @@ export default function VideoPlayer({ youtubeId }: { youtubeId: string }) {
             if (!destroyed) {
               setDuration(playerRef.current?.getDuration() ?? 0);
               setReady(true);
+              logReady();
             }
           },
           onStateChange: (e) => {
@@ -105,6 +124,7 @@ export default function VideoPlayer({ youtubeId }: { youtubeId: string }) {
               stopTimer();
               setCurrentTime(playerRef.current?.getCurrentTime() ?? 0);
             }
+            logState(e.data);
           },
         },
       });
@@ -131,7 +151,7 @@ export default function VideoPlayer({ youtubeId }: { youtubeId: string }) {
       playerRef.current?.destroy();
       playerRef.current = null;
     };
-  }, [youtubeId, startTimer, stopTimer]);
+  }, [youtubeId, startTimer, stopTimer, logReady, logState]);
 
   // ─── 컨트롤 핸들러 ──────────────────────────────────────────────────────────
   function handlePlayPause() {
@@ -141,12 +161,15 @@ export default function VideoPlayer({ youtubeId }: { youtubeId: string }) {
 
   function handleSeek(delta: number) {
     if (!playerRef.current) return;
-    const next = (playerRef.current.getCurrentTime() ?? 0) + delta;
-    playerRef.current.seekTo(Math.max(0, next), true);
+    const from = playerRef.current.getCurrentTime() ?? 0;
+    const to = Math.max(0, from + delta);
+    playerRef.current.seekTo(to, true);
+    logSkip(from, to);
   }
 
   function handleScrub(time: number) {
     if (!playerRef.current) return;
+    logScrub(time); // seekTo 로 위치가 바뀌기 전의 값을 시작 위치로 잡아야 한다.
     playerRef.current.seekTo(time, true);
     setCurrentTime(time);
   }
@@ -155,6 +178,7 @@ export default function VideoPlayer({ youtubeId }: { youtubeId: string }) {
     if (!playerRef.current) return;
     playerRef.current.setPlaybackRate(rate);
     setSpeed(rate);
+    logRate(rate);
   }
 
   function handleFullscreen() {

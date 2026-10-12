@@ -66,3 +66,5 @@ ALTER TABLE allowed_users DISABLE ROW LEVEL SECURITY;
 ALTER TABLE rate_limits DISABLE ROW LEVEL SECURITY;
 ALTER TABLE banners DISABLE ROW LEVEL SECURITY;
 ALTER TABLE access_settings DISABLE ROW LEVEL SECURITY;
+
+-- VOD 이용 로그 테이블(LC-3438)은 docs/supabase-usage-log.sql 에 있다. RLS 를 켜고 INSERT 만 허용한다.

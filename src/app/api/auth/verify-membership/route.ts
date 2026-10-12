@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isPremiumUser, checkRateLimit } from '@/lib/kv';
 import { RATE_LIMIT } from '@/lib/constants';
+import { setUsageLogIdentityCookie } from '@/lib/usageLogIdentity';
 
 function isValidName(name: unknown): name is string {
   return typeof name === 'string' && name.trim().length > 0;
@@ -77,12 +78,15 @@ export async function POST(request: NextRequest) {
 
   const response = NextResponse.json({ isChallenge });
   if (isChallenge) {
+    const maxAge = 60 * 60 * 24 * 365; // 1년 (챌린지 기간 동안 유지)
     response.cookies.set('auth_verified', '1', {
       httpOnly: true,
       sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 60 * 24 * 365, // 1년 (챌린지 기간 동안 유지)
+      maxAge,
     });
+    // 이용 로그(LC-3438) 서명 식별 쿠키. 응답 본문은 바꾸지 않는다.
+    setUsageLogIdentityCookie(response, trimmedName, phoneNum, maxAge);
   }
   return response;
 }

@@ -20,6 +20,7 @@ import {
   checkRateLimit,
   getAccessSettings,
   updateAccessSettings,
+  insertUsageLogs,
 } from '@/lib/kv';
 
 const mockFrom = supabase!.from as jest.Mock;
@@ -487,6 +488,62 @@ describe('kv (Supabase)', () => {
       expect(insertChain2.insert).toHaveBeenCalledWith(
         expect.objectContaining({ require_vod_pass: false }),
       );
+    });
+  });
+
+  describe('insertUsageLogs (LC-3438)', () => {
+    const row = {
+      occurredAt: '2026-10-12T03:00:00.000Z',
+      sessionId: 'sess-1',
+      authMethod: 'verified' as const,
+      userName: '홍길동',
+      userKey: 'hash',
+      eventType: 'video_seek' as const,
+      vodId: 7,
+      youtubeId: 'abc123XYZ',
+      pagePath: '/vod/7',
+      positionSec: 12.3,
+      durationSec: 600,
+      watchedSec: 10,
+      detail: { from_sec: 10, to_sec: 25, method: 'skip' },
+      userAgent: 'jest',
+    };
+
+    it('vod_usage_logs 에 snake_case 컬럼으로 여러 행을 한 번에 넣고 select 하지 않는다', async () => {
+      const chain = createChain({});
+      mockFrom.mockReturnValue(chain);
+
+      await insertUsageLogs([row, { ...row, eventType: 'page_view', vodId: null }]);
+
+      expect(mockFrom).toHaveBeenCalledWith('vod_usage_logs');
+      expect(chain.insert).toHaveBeenCalledTimes(1);
+      expect(chain.insert).toHaveBeenCalledWith([
+        {
+          occurred_at: '2026-10-12T03:00:00.000Z',
+          session_id: 'sess-1',
+          auth_method: 'verified',
+          user_name: '홍길동',
+          user_key: 'hash',
+          event_type: 'video_seek',
+          vod_id: 7,
+          youtube_id: 'abc123XYZ',
+          page_path: '/vod/7',
+          position_sec: 12.3,
+          duration_sec: 600,
+          watched_sec: 10,
+          detail: { from_sec: 10, to_sec: 25, method: 'skip' },
+          user_agent: 'jest',
+        },
+        expect.objectContaining({ event_type: 'page_view', vod_id: null }),
+      ]);
+      expect(chain.select).not.toHaveBeenCalled();
+    });
+
+    it('오류가 나면 throw 한다', async () => {
+      const error = { code: 'PGRST205', message: 'table not found' };
+      mockFrom.mockReturnValue(createChain({ error }));
+
+      await expect(insertUsageLogs([row])).rejects.toBe(error);
     });
   });
 });
