@@ -3,27 +3,18 @@
 import { AuthSession } from './types';
 import { SESSION_KEY, ADMIN_SESSION_KEY } from './constants';
 
-export interface VerifyChallengeResult {
-  isChallenge: boolean;
-  /** 통과하지 못했을 때 서버가 준 안내(LC-3438). 없으면 호출한 쪽의 기본 문구를 쓴다. */
-  message?: string;
-}
-
 export async function verifyChallenge(
   name: string,
   phoneNum: string
-): Promise<VerifyChallengeResult> {
+): Promise<boolean> {
   const response = await fetch('/api/auth/verify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, phoneNum }),
   });
-  if (!response.ok) return { isChallenge: false };
+  if (!response.ok) return false;
   const data = await response.json();
-  return {
-    isChallenge: data.isChallenge === true,
-    message: typeof data.message === 'string' ? data.message : undefined,
-  };
+  return data.isChallenge === true;
 }
 
 export async function verifyMembership(

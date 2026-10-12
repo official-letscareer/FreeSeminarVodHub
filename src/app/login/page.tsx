@@ -19,6 +19,10 @@ const POPUP_NAME = 'letscareer-sso';
 // 동작하지 않는 경우가 있다. 구글도 모바일에서는 리다이렉트로 폴백한다.
 const MOBILE_MAX_WIDTH = 768;
 
+// 이름+전화번호 확인을 통과하지 못했을 때 보이는 문구. 서버 응답과 무관하게 항상 같다.
+const NOT_PASSED_MESSAGE =
+  '현재 참여 중인 챌린지가 없습니다. 이용권을 보유하셨다면 렛츠커리어 로그인으로 확인해주세요.';
+
 function formatPhoneNum(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 11);
   if (digits.length <= 3) return digits;
@@ -178,12 +182,13 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const result = await verifyChallenge(name.trim(), phoneNum.trim());
-      if (result.isChallenge) {
+      const isChallenge = await verifyChallenge(name.trim(), phoneNum.trim());
+      if (isChallenge) {
         setSession({ name: name.trim(), phoneNum: phoneNum.trim() });
         router.push('/vod');
       } else {
-        setError(result.message ?? '현재 참여 중인 챌린지가 없습니다.');
+        // 서버 응답과 무관한 고정 문구 — 사유별로 문구가 갈리면 가입 여부가 드러난다.
+        setError(NOT_PASSED_MESSAGE);
       }
     } catch {
       setError('서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.');

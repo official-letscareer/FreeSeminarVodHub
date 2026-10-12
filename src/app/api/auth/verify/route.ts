@@ -8,9 +8,6 @@ import { RATE_LIMIT } from '@/lib/constants';
 const VOD_PASS_GATE_COOKIE_MAX_AGE = 60 * 60 * 24; // 24시간
 const DEFAULT_COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1년 (챌린지 기간 동안 유지)
 
-// 이 경로는 JWT 가 없어 이용권 보유 여부(미활성 포함)를 알 수 없다. "이용권이 없다"고
-// 단정하지 않고, 이용권을 확인할 수 있는 SSO 로그인으로 안내만 한다.
-const VOD_PASS_LOGIN_GUIDE = '렛츠커리어 로그인으로 이용권을 확인해주세요.';
 
 function readCanWatchVod(source: { canWatchVod?: unknown }): boolean | null {
   return typeof source.canWatchVod === 'boolean' ? source.canWatchVod : null;
@@ -102,7 +99,6 @@ export async function POST(request: NextRequest) {
   // 아래 3단계에서 설정을 읽어 게이트가 켜져 있을 때만 true 가 된다. 예외 유저는 그 단계를
   // 타지 않으므로 항상 false 다.
   let vodPassGateOn = false;
-  let message: string | undefined;
 
   // 1) 예외 유저 테이블 확인
   try {
@@ -184,14 +180,16 @@ export async function POST(request: NextRequest) {
     // 이용권 게이트(LC-3438)가 켜져 있고 렛커 서버가 canWatchVod 를 내려줬으면 위 필터
     // 대신 그 값으로 판정한다. 값이 없으면(null) 이용권을 모르는 구버전 서버라 기존 필터로
     // 되돌아간다 — SSO 경로(`lib/vodAccess.ts`)와 같은 규칙이다.
-    if (isChallenge || canWatchVod === false) {
+    //
+    // 통과하지 못하는 사유(가입 안 됨, 이용권 없음, 게이트 상태)는 응답에 싣지 않는다.
+    // 이 경로는 비인증이라 사유가 갈리면 이름+전화번호 조합으로 가입 여부를 알아낼 수 있다.
+    if (isChallenge) {
       try {
         const settings = await getAccessSettings();
         vodPassGateOn = settings.requireVodPass;
         if (vodPassGateOn && canWatchVod !== null) {
           isChallenge = isChallenge && canWatchVod;
-          if (!canWatchVod) message = VOD_PASS_LOGIN_GUIDE;
-        } else if (isChallenge) {
+        } else {
           isChallenge = isEligibleForAccess(settings, true, optionCodes);
         }
       } catch (err) {
@@ -202,9 +200,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const response = NextResponse.json(
-    message ? { isChallenge, message } : { isChallenge },
-  );
+  const response = NextResponse.json({ isChallenge });
   if (isChallenge) {
     response.cookies.set('auth_verified', '1', {
       httpOnly: true,

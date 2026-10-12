@@ -272,11 +272,8 @@ describe('LoginPage — SSO 버튼 (LC-3208)', () => {
     expect(replaceMock).not.toHaveBeenCalled();
   });
 
-  it('이름+전화번호 확인이 실패하면 서버가 준 안내(message)를 그대로 보여준다', async () => {
-    verifyChallengeMock.mockResolvedValue({
-      isChallenge: false,
-      message: '렛츠커리어 로그인으로 이용권을 확인해주세요.',
-    });
+  it('이름+전화번호 확인이 실패하면 고정 안내 문구를 보여준다', async () => {
+    verifyChallengeMock.mockResolvedValue(false);
     render(<LoginPage />);
 
     fireEvent.change(screen.getByLabelText('이름'), {
@@ -288,30 +285,16 @@ describe('LoginPage — SSO 버튼 (LC-3208)', () => {
     fireEvent.click(screen.getByRole('button', { name: '확인' }));
 
     expect(
-      await screen.findByText('렛츠커리어 로그인으로 이용권을 확인해주세요.'),
+      await screen.findByText(
+        '현재 참여 중인 챌린지가 없습니다. 이용권을 보유하셨다면 렛츠커리어 로그인으로 확인해주세요.',
+      ),
     ).toBeInTheDocument();
     expect(pushMock).not.toHaveBeenCalled();
-  });
-
-  it('서버 안내 없이 실패하면 기존 챌린지 없음 문구를 보여준다', async () => {
-    verifyChallengeMock.mockResolvedValue({ isChallenge: false });
-    render(<LoginPage />);
-
-    fireEvent.change(screen.getByLabelText('이름'), {
-      target: { value: '홍길동' },
-    });
-    fireEvent.change(screen.getByLabelText('전화번호'), {
-      target: { value: '01012345678' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '확인' }));
-
-    expect(
-      await screen.findByText('현재 참여 중인 챌린지가 없습니다.'),
-    ).toBeInTheDocument();
+    expect(setSessionMock).not.toHaveBeenCalled();
   });
 
   it('이름+전화번호 확인에 성공하면 /vod 로 이동한다', async () => {
-    verifyChallengeMock.mockResolvedValue({ isChallenge: true });
+    verifyChallengeMock.mockResolvedValue(true);
     render(<LoginPage />);
 
     fireEvent.change(screen.getByLabelText('이름'), {
