@@ -99,6 +99,7 @@ describe('GET /api/vod', () => {
         name: '홍길동',
         isActiveChallengeParticipant: true,
         optionCodes: [],
+        canWatchVod: null,
       });
       mockGetEnabledVodList.mockResolvedValue(mockList);
 
@@ -135,6 +136,7 @@ describe('GET /api/vod', () => {
         name: '홍길동',
         isActiveChallengeParticipant: false,
         optionCodes: [],
+        canWatchVod: null,
       });
       mockGetAccessSettings.mockResolvedValue(OFF_SETTINGS);
       mockGetEnabledVodList.mockResolvedValue(mockList);
@@ -149,6 +151,7 @@ describe('GET /api/vod', () => {
         name: '홍길동',
         isActiveChallengeParticipant: false,
         optionCodes: [],
+        canWatchVod: null,
       });
       mockGetAccessSettings.mockResolvedValue({
         requireChallengeParticipation: true,
@@ -169,6 +172,7 @@ describe('GET /api/vod', () => {
         name: '홍길동',
         isActiveChallengeParticipant: true,
         optionCodes: ['PLUS1'],
+        canWatchVod: null,
       });
       mockGetAccessSettings.mockResolvedValue({
         requireChallengeParticipation: false,
@@ -187,6 +191,7 @@ describe('GET /api/vod', () => {
         name: '홍길동',
         isActiveChallengeParticipant: true,
         optionCodes: ['WFB1'],
+        canWatchVod: null,
       });
       mockGetAccessSettings.mockResolvedValue({
         requireChallengeParticipation: false,
@@ -263,6 +268,7 @@ describe('GET /api/vod/[id]', () => {
         name: '홍길동',
         isActiveChallengeParticipant: true,
         optionCodes: [],
+        canWatchVod: null,
       });
       mockGetVodList.mockResolvedValue(mockList);
 
@@ -289,6 +295,7 @@ describe('GET /api/vod/[id]', () => {
         name: '홍길동',
         isActiveChallengeParticipant: false,
         optionCodes: [],
+        canWatchVod: null,
       });
       mockGetAccessSettings.mockResolvedValue({
         requireChallengeParticipation: true,
