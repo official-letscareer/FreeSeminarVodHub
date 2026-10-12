@@ -28,7 +28,8 @@ describe('auth utils', () => {
         json: async () => ({ isChallenge: true }),
       });
       const result = await verifyChallenge('홍길동', '01012345678');
-      expect(result).toBe(true);
+      expect(result.isChallenge).toBe(true);
+      expect(result.message).toBeUndefined();
       expect(global.fetch).toHaveBeenCalledWith('/api/auth/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -42,13 +43,30 @@ describe('auth utils', () => {
         json: async () => ({ isChallenge: false }),
       });
       const result = await verifyChallenge('홍길동', '01099999999');
-      expect(result).toBe(false);
+      expect(result.isChallenge).toBe(false);
+      expect(result.message).toBeUndefined();
+    });
+
+    it('서버가 안내 문구(message)를 주면 그대로 돌려준다', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          isChallenge: false,
+          message: '렛츠커리어 로그인으로 이용권을 확인해주세요.',
+        }),
+      });
+      const result = await verifyChallenge('홍길동', '01099999999');
+      expect(result).toEqual({
+        isChallenge: false,
+        message: '렛츠커리어 로그인으로 이용권을 확인해주세요.',
+      });
     });
 
     it('서버 응답 실패(ok: false) 시 false 반환', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({ ok: false });
       const result = await verifyChallenge('홍길동', '01012345678');
-      expect(result).toBe(false);
+      expect(result.isChallenge).toBe(false);
+      expect(result.message).toBeUndefined();
     });
 
     it('네트워크 에러 시 예외 발생', async () => {

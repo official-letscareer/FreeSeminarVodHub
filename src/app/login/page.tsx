@@ -178,12 +178,12 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const isChallenge = await verifyChallenge(name.trim(), phoneNum.trim());
-      if (isChallenge) {
+      const result = await verifyChallenge(name.trim(), phoneNum.trim());
+      if (result.isChallenge) {
         setSession({ name: name.trim(), phoneNum: phoneNum.trim() });
         router.push('/vod');
       } else {
-        setError('현재 참여 중인 챌린지가 없습니다.');
+        setError(result.message ?? '현재 참여 중인 챌린지가 없습니다.');
       }
     } catch {
       setError('서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.');

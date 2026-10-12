@@ -387,4 +387,170 @@ describe('POST /api/auth/verify', () => {
       expect(mockGetAccessSettings).not.toHaveBeenCalled();
     });
   });
+
+  // ─── 이용권 게이트(LC-3438) ───────────────────────────────────────
+  describe('이용권 게이트(LC-3438)', () => {
+    const GUIDE = '렛츠커리어 로그인으로 이용권을 확인해주세요.';
+    const ONE_DAY = 'Max-Age=86400';
+    const ONE_YEAR = 'Max-Age=31536000';
+
+    function gateSettings(overrides: Partial<AccessSettings> = {}) {
+      mockGetAccessSettings.mockResolvedValue({
+        ...OFF_SETTINGS,
+        requireVodPass: true,
+        ...overrides,
+      });
+    }
+
+    function mockVerifyChallenge(data: Record<string, unknown>) {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ data }),
+      });
+    }
+
+    async function verify() {
+      const res = await POST(
+        makeRequest({ name: '홍길동', phoneNum: '01012345678' }),
+      );
+      return { body: await res.json(), cookie: res.headers.get('set-cookie') };
+    }
+
+    it('ON + canWatchVod true → 통과하고 쿠키 수명은 24시간이다', async () => {
+      gateSettings();
+      mockVerifyChallenge({ isChallenge: true, canWatchVod: true });
+
+      const { body, cookie } = await verify();
+
+      expect(body.isChallenge).toBe(true);
+      expect(body.message).toBeUndefined();
+      expect(cookie).toContain('auth_verified=1');
+      expect(cookie).toContain(ONE_DAY);
+    });
+
+    it('ON + canWatchVod true → 챌린지 옵션 필터는 보지 않는다', async () => {
+      gateSettings({
+        requireChallengeOption: true,
+        allowedOptionCodes: ['WFB1'],
+      });
+      mockVerifyChallenge({
+        isChallenge: true,
+        canWatchVod: true,
+        optionCodes: [],
+      });
+
+      const { body } = await verify();
+
+      expect(body.isChallenge).toBe(true);
+    });
+
+    it('ON + canWatchVod false → 통과하지 못하고 이용권을 단정하지 않는 안내를 준다', async () => {
+      gateSettings();
+      mockVerifyChallenge({ isChallenge: true, canWatchVod: false });
+
+      const { body, cookie } = await verify();
+
+      expect(body.isChallenge).toBe(false);
+      expect(body.message).toBe(GUIDE);
+      expect(cookie).toBeNull();
+    });
+
+    it('ON + 챌린지가 아니고 canWatchVod false → 같은 안내를 준다', async () => {
+      gateSettings();
+      mockVerifyChallenge({ isChallenge: false, canWatchVod: false });
+
+      const { body, cookie } = await verify();
+
+      expect(body.isChallenge).toBe(false);
+      expect(body.message).toBe(GUIDE);
+      expect(cookie).toBeNull();
+    });
+
+    it('ON + 챌린지가 아니고 canWatchVod true → 통과시키지 않고 안내도 주지 않는다', async () => {
+      gateSettings();
+      mockVerifyChallenge({ isChallenge: false, canWatchVod: true });
+
+      const { body, cookie } = await verify();
+
+      expect(body.isChallenge).toBe(false);
+      expect(body.message).toBeUndefined();
+      expect(cookie).toBeNull();
+    });
+
+    it('ON + canWatchVod 필드 없음(null) → 기존 필터로 되돌아간다', async () => {
+      gateSettings({
+        requireChallengeOption: true,
+        allowedOptionCodes: ['WFB1'],
+      });
+      mockVerifyChallenge({ isChallenge: true, optionCodes: ['PLUS1'] });
+
+      const { body, cookie } = await verify();
+
+      expect(body.isChallenge).toBe(false);
+      expect(body.message).toBeUndefined();
+      expect(cookie).toBeNull();
+    });
+
+    it('ON + canWatchVod 필드 없음(null) + 기존 필터 통과 → 통과하되 쿠키는 24시간이다', async () => {
+      gateSettings({
+        requireChallengeOption: true,
+        allowedOptionCodes: ['WFB1'],
+      });
+      mockVerifyChallenge({ isChallenge: true, optionCodes: ['WFB1'] });
+
+      const { body, cookie } = await verify();
+
+      expect(body.isChallenge).toBe(true);
+      expect(cookie).toContain(ONE_DAY);
+    });
+
+    it('OFF + canWatchVod true/false → 기존 판정 그대로 통과하고 쿠키는 1년이다', async () => {
+      for (const canWatchVod of [true, false]) {
+        mockGetAccessSettings.mockResolvedValue(OFF_SETTINGS);
+        mockVerifyChallenge({ isChallenge: true, canWatchVod });
+
+        const { body, cookie } = await verify();
+
+        expect(body.isChallenge).toBe(true);
+        expect(body.message).toBeUndefined();
+        expect(cookie).toContain(ONE_YEAR);
+      }
+    });
+
+    it('OFF + canWatchVod null → 기존 판정 그대로 통과하고 쿠키는 1년이다', async () => {
+      mockGetAccessSettings.mockResolvedValue(OFF_SETTINGS);
+      mockVerifyChallenge({ isChallenge: true });
+
+      const { body, cookie } = await verify();
+
+      expect(body.isChallenge).toBe(true);
+      expect(cookie).toContain(ONE_YEAR);
+    });
+
+    it('예외 유저는 게이트가 켜져 있어도 쿠키가 1년이다 — 설정을 읽지 않는다', async () => {
+      mockIsAllowedUser.mockResolvedValue(true);
+      gateSettings();
+
+      const { body, cookie } = await verify();
+
+      expect(body.isChallenge).toBe(true);
+      expect(cookie).toContain(ONE_YEAR);
+      expect(mockGetAccessSettings).not.toHaveBeenCalled();
+    });
+
+    it('최상위 형태 응답({ isChallenge, canWatchVod })도 읽는다', async () => {
+      gateSettings();
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ isChallenge: true, canWatchVod: false }),
+      });
+
+      const { body } = await verify();
+
+      expect(body.isChallenge).toBe(false);
+      expect(body.message).toBe(GUIDE);
+    });
+  });
 });

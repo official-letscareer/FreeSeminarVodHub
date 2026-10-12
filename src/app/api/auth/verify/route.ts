@@ -3,6 +3,19 @@ import { isAllowedUser, checkRateLimit, getAccessSettings } from '@/lib/kv';
 import { isEligibleForAccess } from '@/lib/accessControl';
 import { RATE_LIMIT } from '@/lib/constants';
 
+// 이용권 게이트(LC-3438)가 켜져 있을 때 이 경로로 들어온 `auth_verified` 쿠키의 수명.
+// 이 경로는 이용권 종료일을 받지 못해 쿠키가 만료·비활성을 반영하지 못하므로 짧게 둔다.
+const VOD_PASS_GATE_COOKIE_MAX_AGE = 60 * 60 * 24; // 24시간
+const DEFAULT_COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1년 (챌린지 기간 동안 유지)
+
+// 이 경로는 JWT 가 없어 이용권 보유 여부(미활성 포함)를 알 수 없다. "이용권이 없다"고
+// 단정하지 않고, 이용권을 확인할 수 있는 SSO 로그인으로 안내만 한다.
+const VOD_PASS_LOGIN_GUIDE = '렛츠커리어 로그인으로 이용권을 확인해주세요.';
+
+function readCanWatchVod(source: { canWatchVod?: unknown }): boolean | null {
+  return typeof source.canWatchVod === 'boolean' ? source.canWatchVod : null;
+}
+
 function isValidName(name: unknown): name is string {
   return typeof name === 'string' && name.trim().length > 0;
 }
@@ -84,6 +97,12 @@ export async function POST(request: NextRequest) {
   const trimmedName = name.trim();
   let isChallenge = false;
   let optionCodes: string[] = [];
+  // 렛커 서버가 판정한 시청 가능 여부. 응답에 없으면(구버전 서버·예외 유저) null.
+  let canWatchVod: boolean | null = null;
+  // 아래 3단계에서 설정을 읽어 게이트가 켜져 있을 때만 true 가 된다. 예외 유저는 그 단계를
+  // 타지 않으므로 항상 false 다.
+  let vodPassGateOn = false;
+  let message: string | undefined;
 
   // 1) 예외 유저 테이블 확인
   try {
@@ -134,10 +153,12 @@ export async function POST(request: NextRequest) {
           isChallenge = data.data;
         } else if (typeof data?.data?.isChallenge === 'boolean') {
           isChallenge = data.data.isChallenge;
+          canWatchVod = readCanWatchVod(data.data);
           if (Array.isArray(data?.data?.optionCodes))
             optionCodes = data.data.optionCodes;
         } else if (typeof data?.isChallenge === 'boolean') {
           isChallenge = data.isChallenge;
+          canWatchVod = readCanWatchVod(data);
           if (Array.isArray(data?.optionCodes)) optionCodes = data.optionCodes;
         }
       } else {
@@ -159,10 +180,20 @@ export async function POST(request: NextRequest) {
 
     // 3) 챌린지 참여자/옵션 필터(LC-3208) — 예외 유저는 이 단계를 타지 않는다.
     // 백엔드 호출 자체를 안 거치는 우회라 여기서 걸러지지 않고 그대로 유지된다.
-    if (isChallenge) {
+    //
+    // 이용권 게이트(LC-3438)가 켜져 있고 렛커 서버가 canWatchVod 를 내려줬으면 위 필터
+    // 대신 그 값으로 판정한다. 값이 없으면(null) 이용권을 모르는 구버전 서버라 기존 필터로
+    // 되돌아간다 — SSO 경로(`lib/vodAccess.ts`)와 같은 규칙이다.
+    if (isChallenge || canWatchVod === false) {
       try {
         const settings = await getAccessSettings();
-        isChallenge = isEligibleForAccess(settings, true, optionCodes);
+        vodPassGateOn = settings.requireVodPass;
+        if (vodPassGateOn && canWatchVod !== null) {
+          isChallenge = isChallenge && canWatchVod;
+          if (!canWatchVod) message = VOD_PASS_LOGIN_GUIDE;
+        } else if (isChallenge) {
+          isChallenge = isEligibleForAccess(settings, true, optionCodes);
+        }
       } catch (err) {
         console.error('getAccessSettings error:', err);
         // 설정 조회 실패 시 필터를 적용하지 못하지만, 기존 통과자를 막는 쪽보다
@@ -171,13 +202,17 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const response = NextResponse.json({ isChallenge });
+  const response = NextResponse.json(
+    message ? { isChallenge, message } : { isChallenge },
+  );
   if (isChallenge) {
     response.cookies.set('auth_verified', '1', {
       httpOnly: true,
       sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 60 * 24 * 365, // 1년 (챌린지 기간 동안 유지)
+      maxAge: vodPassGateOn
+        ? VOD_PASS_GATE_COOKIE_MAX_AGE
+        : DEFAULT_COOKIE_MAX_AGE,
     });
   }
   return response;
