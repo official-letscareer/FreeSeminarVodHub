@@ -2,6 +2,7 @@ jest.mock('@/lib/kv');
 
 import { GET } from '@/app/api/admin/usage-logs/route';
 import { NextRequest } from 'next/server';
+import { createAdminSession } from '@/lib/adminSession';
 import { getUsageRecent, getUsageSummary, getUsageUsers } from '@/lib/kv';
 import {
   UsageLogForbiddenError,
@@ -19,17 +20,21 @@ const mockUsers = getUsageUsers as jest.MockedFunction<typeof getUsageUsers>;
 const BASE = 'http://localhost/api/admin/usage-logs';
 const TOKEN = 'b'.repeat(64);
 
-function adminReq(query = ''): NextRequest {
+/** 로그인 직후와 같은 상태: admin_verified 와 서명된 admin_session. */
+function adminReq(query = '', session = createAdminSession()): NextRequest {
   const req = new NextRequest(`${BASE}${query}`);
   req.cookies.set('admin_verified', '1');
+  if (session) req.cookies.set('admin_session', session);
   return req;
 }
 
 const originalToken = process.env.USAGE_LOG_READ_TOKEN;
+const originalPassword = process.env.ADMIN_PASSWORD;
 
 beforeEach(() => {
   jest.clearAllMocks();
   process.env.USAGE_LOG_READ_TOKEN = TOKEN;
+  process.env.ADMIN_PASSWORD = 'test-admin-password';
   jest.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -40,6 +45,8 @@ afterEach(() => {
 afterAll(() => {
   if (originalToken === undefined) delete process.env.USAGE_LOG_READ_TOKEN;
   else process.env.USAGE_LOG_READ_TOKEN = originalToken;
+  if (originalPassword === undefined) delete process.env.ADMIN_PASSWORD;
+  else process.env.ADMIN_PASSWORD = originalPassword;
 });
 
 describe('GET /api/admin/usage-logs 인증', () => {
@@ -58,6 +65,64 @@ describe('GET /api/admin/usage-logs 인증', () => {
 
     expect(res.status).toBe(401);
     expect(mockSummary).not.toHaveBeenCalled();
+  });
+
+  it('서명 없는 admin_verified=1 만 있으면 401 이다', async () => {
+    const req = new NextRequest(`${BASE}?view=summary`);
+    req.cookies.set('admin_verified', '1');
+
+    const res = await GET(req);
+
+    expect(res.status).toBe(401);
+    expect(mockSummary).not.toHaveBeenCalled();
+  });
+
+  it('유효한 세션이 있어도 admin_verified 가 없으면 401 이다', async () => {
+    const req = new NextRequest(`${BASE}?view=summary`);
+    req.cookies.set('admin_session', createAdminSession()!);
+
+    const res = await GET(req);
+
+    expect(res.status).toBe(401);
+    expect(mockSummary).not.toHaveBeenCalled();
+  });
+
+  it('서명이 틀린 admin_session 은 401 이다', async () => {
+    const forged = `v1.${Math.floor(Date.now() / 1000) + 3600}.${'0'.repeat(64)}`;
+
+    const res = await GET(adminReq('?view=summary', forged));
+
+    expect(res.status).toBe(401);
+    expect(mockSummary).not.toHaveBeenCalled();
+  });
+
+  it('만료된 admin_session 은 401 이다', async () => {
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+
+    const res = await GET(
+      adminReq('?view=summary', createAdminSession(twoDaysAgo)),
+    );
+
+    expect(res.status).toBe(401);
+    expect(mockSummary).not.toHaveBeenCalled();
+  });
+
+  it('비밀번호가 바뀌면 이전에 발급된 세션은 401 이다', async () => {
+    const session = createAdminSession();
+    process.env.ADMIN_PASSWORD = 'changed-password';
+
+    const res = await GET(adminReq('?view=summary', session));
+
+    expect(res.status).toBe(401);
+  });
+
+  it('admin_verified=1 과 유효한 세션이 모두 있으면 통과한다', async () => {
+    mockSummary.mockResolvedValue(emptyUsageSummary());
+
+    const res = await GET(adminReq('?view=summary'));
+
+    expect(res.status).toBe(200);
+    expect(mockSummary).toHaveBeenCalledTimes(1);
   });
 
   it('401 응답에도 no-store 가 붙는다', async () => {

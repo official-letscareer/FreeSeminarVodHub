@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUsageRecent, getUsageSummary, getUsageUsers } from '@/lib/kv';
+import { ADMIN_SESSION_COOKIE, verifyAdminSession } from '@/lib/adminSession';
 import {
   UsageLogForbiddenError,
   UsageLogNotConfiguredError,
@@ -8,8 +9,13 @@ import {
   clampUsageLimit,
 } from '@/lib/usageLogAdmin';
 
+// 다른 /api/admin/* 와 달리 서명 없는 admin_verified=1 만으로는 통과하지 못한다.
+// 로그인 때 발급된 서명 세션(admin_session)이 함께 있어야 한다.
 function isAdminAuthorized(request: NextRequest): boolean {
-  return request.cookies.get('admin_verified')?.value === '1';
+  return (
+    request.cookies.get('admin_verified')?.value === '1' &&
+    verifyAdminSession(request.cookies.get(ADMIN_SESSION_COOKIE)?.value)
+  );
 }
 
 // 이용자 이름이 들어 있는 응답이라 어떤 응답도 캐시하지 않는다.
