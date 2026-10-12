@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isAllowedUser, checkRateLimit, getAccessSettings } from '@/lib/kv';
 import { isEligibleForAccess } from '@/lib/accessControl';
 import { RATE_LIMIT } from '@/lib/constants';
-import { setUsageLogIdentityCookies } from '@/lib/usageLogIdentity';
+import { setUsageLogIdentityCookie } from '@/lib/usageLogIdentity';
 
 // 이용권 게이트(LC-3438)가 켜져 있을 때 이 경로로 들어온 `auth_verified` 쿠키의 수명.
 // 이 경로는 이용권 종료일을 받지 못해 쿠키가 만료·비활성을 반영하지 못하므로 짧게 둔다.
@@ -212,8 +212,8 @@ export async function POST(request: NextRequest) {
       path: '/',
       maxAge,
     });
-    // 이용 로그(LC-3438) 식별 쿠키. 응답 본문은 바꾸지 않는다.
-    setUsageLogIdentityCookies(response, trimmedName, phoneNum, maxAge);
+    // 이용 로그(LC-3438) 서명 식별 쿠키. 응답 본문은 바꾸지 않는다.
+    setUsageLogIdentityCookie(response, trimmedName, phoneNum, maxAge);
   }
   return response;
 }

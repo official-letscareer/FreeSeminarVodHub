@@ -85,35 +85,46 @@ describe('이용 로그 식별 쿠키 (LC-3438)', () => {
     ['/api/auth/verify', verify],
     ['/api/auth/verify-membership', verifyMembership],
   ])('POST %s', (url, handler) => {
-    it('성공하면 응답 본문은 그대로이고 httpOnly 식별 쿠키 두 개를 더 심는다', async () => {
+    it('성공하면 응답 본문은 그대로이고 서명된 httpOnly 쿠키 vod_log_id 하나만 더 심는다', async () => {
       const res = await handler(
         post(url, { name: ' 홍길동 ', phoneNum: PHONE }),
       );
 
       expect(await res.json()).toEqual({ isChallenge: true });
       expect(cookieValue(res, 'auth_verified')).toBe('1');
-      expect(cookieValue(res, 'vod_log_uid')).toBe(
-        hmacKey('secret-1', `phone:홍길동:${PHONE}`),
+      expect(cookieValue(res, 'vod_log_uid')).toBeUndefined();
+      expect(cookieValue(res, 'vod_log_uname')).toBeUndefined();
+
+      const value = cookieValue(res, 'vod_log_id')!;
+      const [payload, signature] = value.split('.');
+      expect(JSON.parse(Buffer.from(payload, 'base64url').toString())).toEqual({
+        v: 1,
+        n: '홍길동',
+        k: hmacKey('secret-1', `phone:홍길동:${PHONE}`),
+        iat: expect.any(Number),
+      });
+      expect(signature).toBe(
+        createHmac('sha256', 'secret-1').update(payload).digest('base64url'),
       );
-      expect(decodeURIComponent(cookieValue(res, 'vod_log_uname')!)).toBe(
-        encodeURIComponent('홍길동'),
-      );
-      for (const name of ['vod_log_uid', 'vod_log_uname']) {
-        const line = cookieHeaders(res).find((c) => c.startsWith(`${name}=`))!;
-        expect(line).toMatch(/HttpOnly/i);
-        expect(line).toMatch(/SameSite=lax/i);
-        expect(line).toMatch(/Path=\//i);
-      }
+
+      const line = cookieHeaders(res).find((c) => c.startsWith('vod_log_id='))!;
+      expect(line).toMatch(/HttpOnly/i);
+      expect(line).toMatch(/SameSite=lax/i);
+      expect(line).toMatch(/Path=\//i);
     });
 
-    it('전화번호 원문은 어떤 쿠키 값에도 없고, 하이픈 입력도 정규화한 값으로 만든다', async () => {
+    it('전화번호 원문은 쿠키 값(디코딩한 payload 포함)에 없고, 하이픈 입력도 정규화한 값으로 만든다', async () => {
       const res = await handler(
         post(url, { name: '홍길동', phoneNum: '010-1234-5678' }),
       );
 
-      expect(cookieHeaders(res).join('\n')).not.toContain(PHONE);
-      expect(cookieHeaders(res).join('\n')).not.toContain('1234-5678');
-      expect(cookieValue(res, 'vod_log_uid')).toBe(
+      const value = cookieValue(res, 'vod_log_id')!;
+      const decoded = Buffer.from(value.split('.')[0], 'base64url').toString();
+      for (const text of [cookieHeaders(res).join('\n'), decoded]) {
+        expect(text).not.toContain(PHONE);
+        expect(text).not.toContain('1234-5678');
+      }
+      expect(JSON.parse(decoded).k).toBe(
         hmacKey('secret-1', `phone:홍길동:${PHONE}`),
       );
     });
@@ -126,8 +137,7 @@ describe('이용 로그 식별 쿠키 (LC-3438)', () => {
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({ isChallenge: true });
       expect(cookieValue(res, 'auth_verified')).toBe('1');
-      expect(cookieValue(res, 'vod_log_uid')).toBeUndefined();
-      expect(cookieValue(res, 'vod_log_uname')).toBeUndefined();
+      expect(cookieValue(res, 'vod_log_id')).toBeUndefined();
     });
 
     it('통과하지 못하면 어떤 쿠키도 심지 않는다', async () => {
@@ -146,8 +156,7 @@ describe('이용 로그 식별 쿠키 (LC-3438)', () => {
 
       const expected = maxAge(res, 'auth_verified');
       expect(expected).toBeDefined();
-      expect(maxAge(res, 'vod_log_uid')).toBe(expected);
-      expect(maxAge(res, 'vod_log_uname')).toBe(expected);
+      expect(maxAge(res, 'vod_log_id')).toBe(expected);
     });
 
     it('이름이 100자를 넘으면 식별 쿠키만 생략한다', async () => {
@@ -156,7 +165,7 @@ describe('이용 로그 식별 쿠키 (LC-3438)', () => {
       );
 
       expect(cookieValue(res, 'auth_verified')).toBe('1');
-      expect(cookieValue(res, 'vod_log_uid')).toBeUndefined();
+      expect(cookieValue(res, 'vod_log_id')).toBeUndefined();
     });
 
     it('서버가 심은 쿠키를 그대로 돌려보내면 로그 행에 이름과 키가 들어간다', async () => {
@@ -204,7 +213,6 @@ describe('이용 로그 식별 쿠키 (LC-3438)', () => {
     );
 
     expect(maxAge(res, 'auth_verified')).toBe(String(DAY));
-    expect(maxAge(res, 'vod_log_uid')).toBe(String(DAY));
-    expect(maxAge(res, 'vod_log_uname')).toBe(String(DAY));
+    expect(maxAge(res, 'vod_log_id')).toBe(String(DAY));
   });
 });

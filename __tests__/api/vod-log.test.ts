@@ -41,6 +41,30 @@ function hmacKey(secret: string, input: string) {
 
 const UID = hmacKey('secret-1', 'phone:홍길동:01012345678');
 
+/** 로그인 라우트가 심는 서명 쿠키와 같은 형식. 테스트가 변조·위조 값을 만들 때 쓴다. */
+function signedCookie(
+  payload: Record<string, unknown> = {},
+  secret = 'secret-1',
+) {
+  const body = Buffer.from(
+    JSON.stringify({
+      v: 1,
+      n: '홍길동',
+      k: UID,
+      iat: Math.floor(Date.now() / 1000),
+      ...payload,
+    }),
+  ).toString('base64url');
+  const signature = createHmac('sha256', secret)
+    .update(body)
+    .digest('base64url');
+  return `${body}.${signature}`;
+}
+
+function logCookies(value: string) {
+  return { vod_log_id: value };
+}
+
 function makeReq(
   body: unknown,
   options: {
@@ -166,64 +190,196 @@ describe('POST /api/vod/log', () => {
     });
   });
 
-  it('SSO 쿠키 없이 auth_verified=1 이면 서버가 심은 두 쿠키 값만 쓰고 본문의 이름·키는 무시한다', async () => {
-    const res = await POST(
-      makeReq(BODY, {
-        verified: true,
-        cookies: {
-          vod_log_uid: UID,
-          vod_log_uname: encodeURIComponent('홍길동'),
-        },
-      }),
-    );
+  describe('verified 경로의 서명 쿠키', () => {
+    async function logWith(
+      cookies: Record<string, string>,
+      options: { verified?: boolean } = {},
+    ) {
+      const res = await POST(
+        makeReq(BODY, { verified: options.verified ?? true, cookies }),
+      );
+      return {
+        res,
+        row: mockInsert.mock.calls[0]?.[0][0] as
+          | { userName: string | null; userKey: string | null }
+          | undefined,
+      };
+    }
 
-    expect(res.status).toBe(204);
-    expect(mockProfile).not.toHaveBeenCalled();
-    const rows = mockInsert.mock.calls[0][0];
-    expect(rows[0]).toMatchObject({
-      authMethod: 'verified',
-      userName: '홍길동',
-      userKey: UID,
-      userAgent: 'jest-agent',
-    });
-    expect(JSON.stringify(rows)).not.toContain('클라이언트가 말한 이름');
-    expect(JSON.stringify(rows)).not.toContain('client-key');
-  });
+    function expectAnonymous(row: { userName: unknown; userKey: unknown }) {
+      expect(row).toMatchObject({ userName: null, userKey: null });
+    }
 
-  it('verified 인데 식별 쿠키가 없으면(비밀키 미설정 등) 익명으로 저장하고 본문 값은 쓰지 않는다', async () => {
-    const res = await POST(makeReq(BODY, { verified: true }));
+    it('올바른 서명이면 쿠키의 이름과 키를 쓰고 본문의 이름·키는 무시한다', async () => {
+      const { res, row } = await logWith(logCookies(signedCookie()));
 
-    expect(res.status).toBe(204);
-    for (const row of mockInsert.mock.calls[0][0]) {
+      expect(res.status).toBe(204);
+      expect(mockProfile).not.toHaveBeenCalled();
       expect(row).toMatchObject({
         authMethod: 'verified',
-        userName: null,
-        userKey: null,
+        userName: '홍길동',
+        userKey: UID,
+        userAgent: 'jest-agent',
       });
-    }
-  });
+      const stored = JSON.stringify(mockInsert.mock.calls);
+      expect(stored).not.toContain('클라이언트가 말한 이름');
+      expect(stored).not.toContain('client-key');
+    });
 
-  it.each([
-    ['키 길이가 틀림', 'abc', '%ED%99%8D', null, '홍'],
-    ['키가 16진수가 아님', 'z'.repeat(32), '%ED%99%8D', null, '홍'],
-    ['이름 인코딩이 깨짐', UID, '%E0%A4%A', UID, null],
-    ['이름이 100자 초과', UID, 'a'.repeat(101), UID, null],
-  ])(
-    '식별 쿠키 형식이 틀리면 틀린 값만 버린다: %s',
-    async (_label, uid, uname, expectedKey, expectedName) => {
-      await POST(
+    it('식별 쿠키가 없으면(비밀키 미설정 등) 익명으로 저장하고 로그는 막지 않는다', async () => {
+      const { res, row } = await logWith({});
+
+      expect(res.status).toBe(204);
+      expect(row).toMatchObject({ authMethod: 'verified' });
+      expectAnonymous(row!);
+    });
+
+    it('payload 의 이름을 바꾸면 서명이 맞지 않아 익명이다', async () => {
+      const [, signature] = signedCookie().split('.');
+      const forged = Buffer.from(
+        JSON.stringify({ v: 1, n: '남의이름', k: UID, iat: 1 }),
+      ).toString('base64url');
+
+      const { res, row } = await logWith(logCookies(`${forged}.${signature}`));
+
+      expect(res.status).toBe(204);
+      expectAnonymous(row!);
+    });
+
+    it('payload 의 키를 바꾸면 익명이다', async () => {
+      const [, signature] = signedCookie().split('.');
+      const forged = Buffer.from(
+        JSON.stringify({
+          v: 1,
+          n: '홍길동',
+          k: 'a'.repeat(32),
+          iat: Math.floor(Date.now() / 1000),
+        }),
+      ).toString('base64url');
+
+      const { row } = await logWith(logCookies(`${forged}.${signature}`));
+
+      expectAnonymous(row!);
+    });
+
+    it('서명을 바꾸면 익명이다', async () => {
+      const [payload, signature] = signedCookie().split('.');
+      const flipped = (signature[0] === 'A' ? 'B' : 'A') + signature.slice(1);
+
+      const { row } = await logWith(logCookies(`${payload}.${flipped}`));
+
+      expectAnonymous(row!);
+    });
+
+    it('다른 비밀키로 만든 쿠키는 익명이다', async () => {
+      const { row } = await logWith(
+        logCookies(signedCookie({}, 'another-secret')),
+      );
+
+      expectAnonymous(row!);
+    });
+
+    it('서버 비밀키가 없으면 형식이 맞는 쿠키도 익명이다', async () => {
+      delete process.env.USAGE_LOG_HASH_SECRET;
+
+      const { res, row } = await logWith(logCookies(signedCookie()));
+
+      expect(res.status).toBe(204);
+      expectAnonymous(row!);
+    });
+
+    it.each([
+      ['빈 값', ''],
+      ['점이 없음', 'abcdef'],
+      ['점이 둘 이상', 'a.b.c'],
+      ['서명이 비어 있음', `${signedCookie().split('.')[0]}.`],
+      ['서명 길이가 다름', `${signedCookie().split('.')[0]}.abc`],
+      [
+        'payload 가 JSON 이 아님',
+        (() => {
+          const body = Buffer.from('not json').toString('base64url');
+          const sig = createHmac('sha256', 'secret-1')
+            .update(body)
+            .digest('base64url');
+          return `${body}.${sig}`;
+        })(),
+      ],
+    ])('쿠키 형식이 틀리면 익명이다: %s', async (_label, value) => {
+      const { res, row } = await logWith(logCookies(value));
+
+      expect(res.status).toBe(204);
+      expectAnonymous(row!);
+    });
+
+    it.each([
+      ['버전 불일치', { v: 2 }],
+      ['이름이 비어 있음', { n: '' }],
+      ['이름이 100자 초과', { n: '가'.repeat(101) }],
+      ['이름이 문자열이 아님', { n: 7 }],
+      ['키 형식이 틀림', { k: 'xyz' }],
+      [
+        '발급 시각이 5분 넘게 미래',
+        { iat: Math.floor(Date.now() / 1000) + 600 },
+      ],
+      ['발급 시각이 숫자가 아님', { iat: 'now' }],
+    ])('서명이 맞아도 내용이 틀리면 익명이다: %s', async (_label, payload) => {
+      const { row } = await logWith(logCookies(signedCookie(payload)));
+
+      expectAnonymous(row!);
+    });
+
+    it('발급 시각이 5분 이내 미래이거나 오래돼도 통과한다(만료 판단에 쓰지 않는다)', async () => {
+      const nowSec = Math.floor(Date.now() / 1000);
+
+      const near = await logWith(
+        logCookies(signedCookie({ iat: nowSec + 240 })),
+      );
+      expect(near.row).toMatchObject({ userName: '홍길동', userKey: UID });
+
+      jest.clearAllMocks();
+      mockInsert.mockResolvedValue(undefined);
+      const old = await logWith(logCookies(signedCookie({ iat: 1 })));
+      expect(old.row).toMatchObject({ userName: '홍길동', userKey: UID });
+    });
+
+    it('이전 방식의 두 쿠키(vod_log_uid, vod_log_uname)만 보내면 익명이다', async () => {
+      const { res, row } = await logWith({
+        vod_log_uid: UID,
+        vod_log_uname: encodeURIComponent('홍길동'),
+      });
+
+      expect(res.status).toBe(204);
+      expectAnonymous(row!);
+    });
+
+    it('auth_verified 없이 vod_log_id 만 있으면 401 이다', async () => {
+      const { res } = await logWith(logCookies(signedCookie()), {
+        verified: false,
+      });
+
+      expect(res.status).toBe(401);
+      expect(mockInsert).not.toHaveBeenCalled();
+    });
+
+    it('SSO 경로는 vod_log_id 를 읽지 않고 프로필 이름만 쓴다', async () => {
+      mockProfile.mockResolvedValue(SSO_PROFILE);
+
+      const res = await POST(
         makeReq(BODY, {
+          sso: 'jwt',
           verified: true,
-          cookies: { vod_log_uid: uid, vod_log_uname: uname },
+          cookies: logCookies(signedCookie({ n: '다른사람' })),
         }),
       );
 
+      expect(res.status).toBe(204);
       expect(mockInsert.mock.calls[0][0][0]).toMatchObject({
-        userKey: expectedKey,
-        userName: expectedName,
+        authMethod: 'sso',
+        userName: '김렛커',
+        userKey: hmacKey('secret-1', 'sso:김렛커'),
       });
-    },
-  );
+    });
+  });
 
   it('auth_verified 값이 1 이 아니면 인증으로 보지 않는다', async () => {
     const req = makeReq(BODY);

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isPremiumUser, checkRateLimit } from '@/lib/kv';
 import { RATE_LIMIT } from '@/lib/constants';
-import { setUsageLogIdentityCookies } from '@/lib/usageLogIdentity';
+import { setUsageLogIdentityCookie } from '@/lib/usageLogIdentity';
 
 function isValidName(name: unknown): name is string {
   return typeof name === 'string' && name.trim().length > 0;
@@ -85,8 +85,8 @@ export async function POST(request: NextRequest) {
       path: '/',
       maxAge,
     });
-    // 이용 로그(LC-3438) 식별 쿠키. 응답 본문은 바꾸지 않는다.
-    setUsageLogIdentityCookies(response, trimmedName, phoneNum, maxAge);
+    // 이용 로그(LC-3438) 서명 식별 쿠키. 응답 본문은 바꾸지 않는다.
+    setUsageLogIdentityCookie(response, trimmedName, phoneNum, maxAge);
   }
   return response;
 }
