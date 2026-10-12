@@ -4,7 +4,7 @@ jest.mock('@/lib/sso', () => ({
   getSsoUserProfile: jest.fn(),
 }));
 
-import { createHash } from 'node:crypto';
+import { createHmac } from 'node:crypto';
 import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/vod/log/route';
 import { insertUsageLogs } from '@/lib/kv';
@@ -35,11 +35,27 @@ const BODY = {
   ],
 };
 
+function hmacKey(secret: string, input: string) {
+  return createHmac('sha256', secret).update(input).digest('hex').slice(0, 32);
+}
+
+const UID = hmacKey('secret-1', 'phone:홍길동:01012345678');
+
 function makeReq(
   body: unknown,
-  options: { sso?: string | null; verified?: boolean; ua?: string } = {},
+  options: {
+    sso?: string | null;
+    verified?: boolean;
+    ua?: string;
+    cookies?: Record<string, string>;
+  } = {},
 ) {
-  const { sso = null, verified = false, ua = 'jest-agent' } = options;
+  const {
+    sso = null,
+    verified = false,
+    ua = 'jest-agent',
+    cookies = {},
+  } = options;
   const req = new NextRequest('http://localhost/api/vod/log', {
     method: 'POST',
     body: typeof body === 'string' ? body : JSON.stringify(body),
@@ -47,6 +63,9 @@ function makeReq(
   });
   if (sso) req.cookies.set(SSO_ACCESS_TOKEN_COOKIE, sso);
   if (verified) req.cookies.set('auth_verified', '1');
+  for (const [name, value] of Object.entries(cookies)) {
+    req.cookies.set(name, value);
+  }
   return req;
 }
 
@@ -57,14 +76,21 @@ const SSO_PROFILE = {
   canWatchVod: false,
 };
 
+const originalSecret = process.env.USAGE_LOG_HASH_SECRET;
+
 describe('POST /api/vod/log', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockInsert.mockResolvedValue(undefined);
     jest.spyOn(console, 'error').mockImplementation(() => {});
+    process.env.USAGE_LOG_HASH_SECRET = 'secret-1';
   });
 
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+    if (originalSecret === undefined) delete process.env.USAGE_LOG_HASH_SECRET;
+    else process.env.USAGE_LOG_HASH_SECRET = originalSecret;
+  });
 
   it('인증 쿠키가 둘 다 없으면 401 이고 저장하지 않는다', async () => {
     const res = await POST(makeReq(BODY));
@@ -82,7 +108,7 @@ describe('POST /api/vod/log', () => {
     expect(mockInsert).not.toHaveBeenCalled();
   });
 
-  it('SSO 는 프로필 이름과 sso: 해시를 쓰고 클라이언트가 보낸 이름·키는 무시한다', async () => {
+  it('SSO 는 프로필 이름과 서버 HMAC 키를 쓰고 본문의 이름·키는 무시한다', async () => {
     mockProfile.mockResolvedValue(SSO_PROFILE);
 
     const res = await POST(makeReq(BODY, { sso: 'jwt', ua: 'x'.repeat(300) }));
@@ -91,12 +117,11 @@ describe('POST /api/vod/log', () => {
     expect(mockProfile).toHaveBeenCalledWith('jwt');
     const rows = mockInsert.mock.calls[0][0];
     expect(rows).toHaveLength(2);
-    const expectedKey = createHash('sha256').update('sso:김렛커').digest('hex');
     for (const row of rows) {
       expect(row).toMatchObject({
         authMethod: 'sso',
         userName: '김렛커',
-        userKey: expectedKey,
+        userKey: hmacKey('secret-1', 'sso:김렛커'),
         sessionId: 'sess-1',
       });
       expect(row.userAgent).toHaveLength(200);
@@ -110,19 +135,95 @@ describe('POST /api/vod/log', () => {
     });
   });
 
-  it('SSO 쿠키 없이 auth_verified=1 이면 클라이언트의 이름·키를 쓴다', async () => {
-    const res = await POST(makeReq(BODY, { verified: true }));
+  it('같은 입력은 같은 키, 다른 비밀키는 다른 키를 만든다', async () => {
+    mockProfile.mockResolvedValue(SSO_PROFILE);
+
+    await POST(makeReq(BODY, { sso: 'jwt' }));
+    await POST(makeReq(BODY, { sso: 'jwt' }));
+    process.env.USAGE_LOG_HASH_SECRET = 'secret-2';
+    await POST(makeReq(BODY, { sso: 'jwt' }));
+
+    const [first, second, third] = mockInsert.mock.calls.map(
+      ([rows]) => rows[0].userKey,
+    );
+    expect(first).toMatch(/^[0-9a-f]{32}$/);
+    expect(second).toBe(first);
+    expect(third).toMatch(/^[0-9a-f]{32}$/);
+    expect(third).not.toBe(first);
+  });
+
+  it('비밀키가 없으면 SSO 도 이름만 저장하고 키는 null 이며 로그는 막지 않는다', async () => {
+    delete process.env.USAGE_LOG_HASH_SECRET;
+    mockProfile.mockResolvedValue(SSO_PROFILE);
+
+    const res = await POST(makeReq(BODY, { sso: 'jwt' }));
+
+    expect(res.status).toBe(204);
+    expect(mockInsert.mock.calls[0][0][0]).toMatchObject({
+      authMethod: 'sso',
+      userName: '김렛커',
+      userKey: null,
+    });
+  });
+
+  it('SSO 쿠키 없이 auth_verified=1 이면 서버가 심은 두 쿠키 값만 쓰고 본문의 이름·키는 무시한다', async () => {
+    const res = await POST(
+      makeReq(BODY, {
+        verified: true,
+        cookies: {
+          vod_log_uid: UID,
+          vod_log_uname: encodeURIComponent('홍길동'),
+        },
+      }),
+    );
 
     expect(res.status).toBe(204);
     expect(mockProfile).not.toHaveBeenCalled();
     const rows = mockInsert.mock.calls[0][0];
     expect(rows[0]).toMatchObject({
       authMethod: 'verified',
-      userName: '클라이언트가 말한 이름',
-      userKey: 'client-key',
+      userName: '홍길동',
+      userKey: UID,
       userAgent: 'jest-agent',
     });
+    expect(JSON.stringify(rows)).not.toContain('클라이언트가 말한 이름');
+    expect(JSON.stringify(rows)).not.toContain('client-key');
   });
+
+  it('verified 인데 식별 쿠키가 없으면(비밀키 미설정 등) 익명으로 저장하고 본문 값은 쓰지 않는다', async () => {
+    const res = await POST(makeReq(BODY, { verified: true }));
+
+    expect(res.status).toBe(204);
+    for (const row of mockInsert.mock.calls[0][0]) {
+      expect(row).toMatchObject({
+        authMethod: 'verified',
+        userName: null,
+        userKey: null,
+      });
+    }
+  });
+
+  it.each([
+    ['키 길이가 틀림', 'abc', '%ED%99%8D', null, '홍'],
+    ['키가 16진수가 아님', 'z'.repeat(32), '%ED%99%8D', null, '홍'],
+    ['이름 인코딩이 깨짐', UID, '%E0%A4%A', UID, null],
+    ['이름이 100자 초과', UID, 'a'.repeat(101), UID, null],
+  ])(
+    '식별 쿠키 형식이 틀리면 틀린 값만 버린다: %s',
+    async (_label, uid, uname, expectedKey, expectedName) => {
+      await POST(
+        makeReq(BODY, {
+          verified: true,
+          cookies: { vod_log_uid: uid, vod_log_uname: uname },
+        }),
+      );
+
+      expect(mockInsert.mock.calls[0][0][0]).toMatchObject({
+        userKey: expectedKey,
+        userName: expectedName,
+      });
+    },
+  );
 
   it('auth_verified 값이 1 이 아니면 인증으로 보지 않는다', async () => {
     const req = makeReq(BODY);

@@ -55,10 +55,11 @@ export interface UsageEvent {
   occurredAt: string;
 }
 
+/**
+ * 식별 값(이름, 키)은 본문에 없다. 서버가 쿠키와 SSO 프로필에서만 만든다.
+ */
 export interface UsageBatch {
   sessionId: string;
-  userName: string | null;
-  userKey: string | null;
   events: UsageEvent[];
 }
 
@@ -73,7 +74,6 @@ export const USAGE_LIMITS = {
   DETAIL_KEY_LENGTH_MAX: 50,
   DETAIL_STRING_MAX: 100,
   USER_NAME_MAX: 100,
-  USER_KEY_MAX: 64,
   USER_AGENT_MAX: 200,
   /** occurredAt 이 서버 시각보다 이만큼 이전이면 서버 시각으로 대체한다 */
   OCCURRED_PAST_MS: 24 * 60 * 60 * 1000,
@@ -206,8 +206,8 @@ function sanitizeEvent(raw: unknown, now: Date): UsageEvent | null {
 /**
  * `POST /api/vod/log` 본문을 검증한다.
  *
- * 규칙을 어긴 이벤트는 버리고 나머지는 남긴다. 배치 자체가 틀렸거나(세션 ID, 이벤트 개수,
- * 이름·키 길이) 남는 이벤트가 하나도 없으면 null 이다.
+ * 규칙을 어긴 이벤트는 버리고 나머지는 남긴다. 배치 자체가 틀렸거나(세션 ID, 이벤트 개수)
+ * 남는 이벤트가 하나도 없으면 null 이다. 본문에 이름·키가 있어도 읽지 않는다.
  *
  * @param now 테스트가 시각을 고정할 때만 넘긴다.
  */
@@ -217,7 +217,7 @@ export function sanitizeUsageBatch(
 ): UsageBatch | null {
   if (!isRecord(raw)) return null;
 
-  const { sessionId, userName, userKey, events } = raw;
+  const { sessionId, events } = raw;
 
   if (
     typeof sessionId !== 'string' ||
@@ -233,24 +233,6 @@ export function sanitizeUsageBatch(
   ) {
     return null;
   }
-  if (
-    !isAbsent(userName) &&
-    !(
-      typeof userName === 'string' &&
-      userName.length <= USAGE_LIMITS.USER_NAME_MAX
-    )
-  ) {
-    return null;
-  }
-  if (
-    !isAbsent(userKey) &&
-    !(
-      typeof userKey === 'string' && userKey.length <= USAGE_LIMITS.USER_KEY_MAX
-    )
-  ) {
-    return null;
-  }
-
   const valid: UsageEvent[] = [];
   for (const item of events) {
     const event = sanitizeEvent(item, now);
@@ -258,10 +240,5 @@ export function sanitizeUsageBatch(
   }
   if (valid.length === 0) return null;
 
-  return {
-    sessionId,
-    userName: userName || null,
-    userKey: userKey || null,
-    events: valid,
-  };
+  return { sessionId, events: valid };
 }

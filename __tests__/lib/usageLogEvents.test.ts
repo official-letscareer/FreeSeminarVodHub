@@ -44,8 +44,6 @@ describe('sanitizeUsageBatch', () => {
 
     expect(result).toEqual({
       sessionId: 'sess-1',
-      userName: '홍길동',
-      userKey: 'a'.repeat(64),
       events: [
         {
           type: 'video_seek',
@@ -80,8 +78,7 @@ describe('sanitizeUsageBatch', () => {
       watchedSec: null,
       detail: {},
     });
-    expect(result?.userName).toBeNull();
-    expect(result?.userKey).toBeNull();
+    expect(Object.keys(result ?? {}).sort()).toEqual(['events', 'sessionId']);
   });
 
   it('허용된 이벤트 종류를 모두 받는다', () => {
@@ -128,24 +125,23 @@ describe('sanitizeUsageBatch', () => {
       ).toBeNull();
     });
 
-    it('userName 은 100자, userKey 는 64자까지만 받는다', () => {
+    it('본문의 userName, userKey 는 값이 무엇이든 읽지 않고 결과에 싣지 않는다', () => {
       const events = [{ type: 'page_view' }];
 
-      expect(
-        sanitizeUsageBatch(batch(events, { userName: '가'.repeat(100) }), NOW),
-      ).not.toBeNull();
-      expect(
-        sanitizeUsageBatch(batch(events, { userName: '가'.repeat(101) }), NOW),
-      ).toBeNull();
-      expect(
-        sanitizeUsageBatch(batch(events, { userKey: 'a'.repeat(64) }), NOW),
-      ).not.toBeNull();
-      expect(
-        sanitizeUsageBatch(batch(events, { userKey: 'a'.repeat(65) }), NOW),
-      ).toBeNull();
-      expect(
-        sanitizeUsageBatch(batch(events, { userName: 1 }), NOW),
-      ).toBeNull();
+      for (const extra of [
+        { userName: '홍길동', userKey: 'a'.repeat(64) },
+        { userName: '가'.repeat(101), userKey: 'a'.repeat(65) },
+        { userName: 1, userKey: { nested: true } },
+      ]) {
+        const result = sanitizeUsageBatch(batch(events, extra), NOW);
+
+        expect(result).not.toBeNull();
+        expect(Object.keys(result ?? {}).sort()).toEqual([
+          'events',
+          'sessionId',
+        ]);
+        expect(JSON.stringify(result)).not.toContain('홍길동');
+      }
     });
   });
 
