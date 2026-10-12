@@ -457,6 +457,7 @@ const DEFAULT_ACCESS_SETTINGS: AccessSettings = {
   requireChallengeParticipation: false,
   requireChallengeOption: false,
   allowedOptionCodes: [],
+  requireVodPass: false,
 };
 
 function toAccessSettings(row: Record<string, unknown>): AccessSettings {
@@ -466,6 +467,8 @@ function toAccessSettings(row: Record<string, unknown>): AccessSettings {
     allowedOptionCodes: Array.isArray(row.allowed_option_codes)
       ? (row.allowed_option_codes as string[])
       : [],
+    // 컬럼이 아직 없는 DB(ALTER 적용 전)에서는 undefined 라 false 로 떨어진다.
+    requireVodPass: row.require_vod_pass === true,
   };
 }
 
@@ -504,6 +507,9 @@ export async function updateAccessSettings(
   if (settings.allowedOptionCodes !== undefined) {
     updates.allowed_option_codes = settings.allowedOptionCodes;
   }
+  if (settings.requireVodPass !== undefined) {
+    updates.require_vod_pass = settings.requireVodPass;
+  }
 
   if (existing) {
     const { data, error } = await getSupabase()
@@ -529,4 +535,5 @@ const DEFAULT_ACCESS_SETTINGS_ROW = {
   require_challenge_participation: false,
   require_challenge_option: false,
   allowed_option_codes: [],
+  require_vod_pass: false,
 };

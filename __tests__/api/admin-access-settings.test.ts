@@ -49,6 +49,7 @@ const mockSettings = {
   requireChallengeParticipation: false,
   requireChallengeOption: true,
   allowedOptionCodes: ['WFB1', 'LFB2'],
+  requireVodPass: false,
 };
 
 // ─── GET /api/admin/access-settings ───────────────────────────────────

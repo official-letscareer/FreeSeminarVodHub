@@ -158,6 +158,7 @@ export default function AdminVodPage() {
     requireChallengeParticipation: false,
     requireChallengeOption: false,
     allowedOptionCodes: [],
+    requireVodPass: false,
   });
   const [accessSettingsLoading, setAccessSettingsLoading] = useState(true);
   const [accessSettingsSaving, setAccessSettingsSaving] = useState(false);

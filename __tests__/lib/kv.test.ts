@@ -18,6 +18,8 @@ import {
   deleteAllowedUser,
   isAllowedUser,
   checkRateLimit,
+  getAccessSettings,
+  updateAccessSettings,
 } from '@/lib/kv';
 
 const mockFrom = supabase!.from as jest.Mock;
@@ -48,6 +50,7 @@ function createChain(result: {
     chain[method] = jest.fn(() => chain);
   }
   chain.single = jest.fn(() => Promise.resolve(resolveValue));
+  chain.maybeSingle = jest.fn(() => Promise.resolve(resolveValue));
   chain.then = (resolve: (v: unknown) => void) =>
     Promise.resolve(resolveValue).then(resolve);
   return chain;
@@ -391,6 +394,99 @@ describe('kv (Supabase)', () => {
       const result = await checkRateLimit('test:key', 5, 60);
       expect(result.allowed).toBe(false);
       expect(result.remaining).toBe(0);
+    });
+  });
+  describe('접근 설정 requireVodPass(LC-3438)', () => {
+    const baseRow = {
+      id: 1,
+      require_challenge_participation: false,
+      require_challenge_option: true,
+      allowed_option_codes: ['WFB1'],
+    };
+
+    it('getAccessSettings: require_vod_pass 컬럼 값을 읽는다', async () => {
+      mockFrom.mockReturnValue(
+        createChain({ data: { ...baseRow, require_vod_pass: true } }),
+      );
+
+      const result = await getAccessSettings();
+
+      expect(result.requireVodPass).toBe(true);
+      expect(result.requireChallengeOption).toBe(true);
+      expect(mockFrom).toHaveBeenCalledWith('access_settings');
+    });
+
+    it('getAccessSettings: 컬럼이 없는 행(ALTER 적용 전)은 false 로 읽는다', async () => {
+      mockFrom.mockReturnValue(createChain({ data: baseRow }));
+
+      const result = await getAccessSettings();
+
+      expect(result.requireVodPass).toBe(false);
+    });
+
+    it('getAccessSettings: 행이 아직 없으면 기본값은 false 다', async () => {
+      mockFrom.mockReturnValue(createChain({ data: null }));
+
+      const result = await getAccessSettings();
+
+      expect(result.requireVodPass).toBe(false);
+    });
+
+    it('updateAccessSettings: 기존 행에는 require_vod_pass 만 갱신한다', async () => {
+      const selectChain = createChain({ data: { id: 1 } });
+      const updateChain = createChain({
+        data: { ...baseRow, require_vod_pass: true },
+      });
+      mockFrom
+        .mockReturnValueOnce(selectChain)
+        .mockReturnValueOnce(updateChain);
+
+      const result = await updateAccessSettings({ requireVodPass: true });
+
+      expect(updateChain.update).toHaveBeenCalledWith({
+        require_vod_pass: true,
+      });
+      expect(result.requireVodPass).toBe(true);
+    });
+
+    it('updateAccessSettings: requireVodPass 를 보내지 않으면 컬럼을 건드리지 않는다', async () => {
+      const selectChain = createChain({ data: { id: 1 } });
+      const updateChain = createChain({ data: baseRow });
+      mockFrom
+        .mockReturnValueOnce(selectChain)
+        .mockReturnValueOnce(updateChain);
+
+      await updateAccessSettings({ requireChallengeOption: true });
+
+      expect(updateChain.update).toHaveBeenCalledWith({
+        require_challenge_option: true,
+      });
+    });
+
+    it('updateAccessSettings: 행이 없으면 기본 행에 false 를 넣고 보낸 값으로 덮는다', async () => {
+      const selectChain = createChain({ data: null });
+      const insertChain = createChain({
+        data: { ...baseRow, require_vod_pass: true },
+      });
+      mockFrom
+        .mockReturnValueOnce(selectChain)
+        .mockReturnValueOnce(insertChain);
+
+      await updateAccessSettings({ requireVodPass: true });
+      expect(insertChain.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ require_vod_pass: true }),
+      );
+
+      const selectChain2 = createChain({ data: null });
+      const insertChain2 = createChain({ data: baseRow });
+      mockFrom
+        .mockReturnValueOnce(selectChain2)
+        .mockReturnValueOnce(insertChain2);
+
+      await updateAccessSettings({ requireChallengeOption: true });
+      expect(insertChain2.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ require_vod_pass: false }),
+      );
     });
   });
 });

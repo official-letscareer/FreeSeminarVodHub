@@ -23,6 +23,7 @@ const OFF_SETTINGS: AccessSettings = {
   requireChallengeParticipation: false,
   requireChallengeOption: false,
   allowedOptionCodes: [],
+  requireVodPass: false,
 };
 
 function makeAuthReq(url: string): NextRequest {
@@ -153,6 +154,7 @@ describe('GET /api/vod', () => {
         requireChallengeParticipation: true,
         requireChallengeOption: false,
         allowedOptionCodes: [],
+        requireVodPass: false,
       });
 
       const res = await vodListGet(makeSsoReq('http://localhost/api/vod'));
@@ -172,6 +174,7 @@ describe('GET /api/vod', () => {
         requireChallengeParticipation: false,
         requireChallengeOption: true,
         allowedOptionCodes: ['WFB1', 'LFB2'],
+        requireVodPass: false,
       });
 
       const res = await vodListGet(makeSsoReq('http://localhost/api/vod'));
@@ -189,6 +192,7 @@ describe('GET /api/vod', () => {
         requireChallengeParticipation: false,
         requireChallengeOption: true,
         allowedOptionCodes: ['WFB1', 'LFB2'],
+        requireVodPass: false,
       });
       mockGetEnabledVodList.mockResolvedValue(mockList);
 
@@ -290,6 +294,7 @@ describe('GET /api/vod/[id]', () => {
         requireChallengeParticipation: true,
         requireChallengeOption: false,
         allowedOptionCodes: [],
+        requireVodPass: false,
       });
 
       const res = await vodDetailGet(makeSsoReq('http://localhost/api/vod/1'), {

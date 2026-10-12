@@ -19,6 +19,7 @@ const OFF_SETTINGS: AccessSettings = {
   requireChallengeParticipation: false,
   requireChallengeOption: false,
   allowedOptionCodes: [],
+  requireVodPass: false,
 };
 
 const originalFetch = global.fetch;
@@ -295,6 +296,7 @@ describe('POST /api/auth/verify', () => {
         requireChallengeParticipation: true,
         requireChallengeOption: false,
         allowedOptionCodes: [],
+        requireVodPass: false,
       });
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
@@ -314,6 +316,7 @@ describe('POST /api/auth/verify', () => {
         requireChallengeParticipation: false,
         requireChallengeOption: true,
         allowedOptionCodes: ['WFB1', 'LFB2'],
+        requireVodPass: false,
       });
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
@@ -335,6 +338,7 @@ describe('POST /api/auth/verify', () => {
         requireChallengeParticipation: false,
         requireChallengeOption: true,
         allowedOptionCodes: ['WFB1', 'LFB2'],
+        requireVodPass: false,
       });
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
@@ -372,6 +376,7 @@ describe('POST /api/auth/verify', () => {
         requireChallengeParticipation: true,
         requireChallengeOption: true,
         allowedOptionCodes: ['WFB1'],
+        requireVodPass: false,
       });
 
       const res = await POST(
