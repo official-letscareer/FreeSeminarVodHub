@@ -38,6 +38,7 @@ export async function PATCH(request: NextRequest) {
     requireChallengeParticipation,
     requireChallengeOption,
     allowedOptionCodes,
+    requireVodPass,
   } = body as Record<string, unknown>;
 
   if (
@@ -69,10 +70,18 @@ export async function PATCH(request: NextRequest) {
     );
   }
 
+  if (requireVodPass !== undefined && typeof requireVodPass !== 'boolean') {
+    return NextResponse.json(
+      { message: 'requireVodPass는 boolean이어야 합니다.' },
+      { status: 400 },
+    );
+  }
+
   const settings = await updateAccessSettings({
     requireChallengeParticipation,
     requireChallengeOption,
     allowedOptionCodes: allowedOptionCodes as string[] | undefined,
+    requireVodPass,
   });
   return NextResponse.json(settings);
 }
