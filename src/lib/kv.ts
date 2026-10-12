@@ -6,6 +6,7 @@ import {
   Banner,
   AccessSettings,
 } from './types';
+import type { UsageDetail, UsageEventType } from './usageLogEvents';
 
 function getSupabase() {
   if (!supabase) throw new Error('Supabase가 설정되지 않았습니다.');
@@ -537,3 +538,51 @@ const DEFAULT_ACCESS_SETTINGS_ROW = {
   allowed_option_codes: [],
   require_vod_pass: false,
 };
+
+// ─── 이용 로그 (LC-3438) ──────────────────────────────────────────────────────
+export interface UsageLogRow {
+  occurredAt: string;
+  sessionId: string;
+  authMethod: 'sso' | 'verified';
+  userName: string | null;
+  userKey: string | null;
+  eventType: UsageEventType;
+  vodId: number | null;
+  youtubeId: string | null;
+  pagePath: string | null;
+  positionSec: number | null;
+  durationSec: number | null;
+  watchedSec: number | null;
+  detail: UsageDetail;
+  userAgent: string | null;
+}
+
+/**
+ * `vod_usage_logs` 에 여러 행을 한 번에 넣는다.
+ *
+ * 이 테이블은 RLS 가 INSERT 만 허용한다(docs/supabase-usage-log.sql). 그래서 `.select()` 를
+ * 붙이지 않는다 — 삽입한 행을 되읽는 요청은 SELECT 정책이 없어 실패한다.
+ */
+export async function insertUsageLogs(rows: UsageLogRow[]): Promise<void> {
+  const { error } = await getSupabase()
+    .from('vod_usage_logs')
+    .insert(
+      rows.map((row) => ({
+        occurred_at: row.occurredAt,
+        session_id: row.sessionId,
+        auth_method: row.authMethod,
+        user_name: row.userName,
+        user_key: row.userKey,
+        event_type: row.eventType,
+        vod_id: row.vodId,
+        youtube_id: row.youtubeId,
+        page_path: row.pagePath,
+        position_sec: row.positionSec,
+        duration_sec: row.durationSec,
+        watched_sec: row.watchedSec,
+        detail: row.detail,
+        user_agent: row.userAgent,
+      })),
+    );
+  if (error) throw error;
+}
