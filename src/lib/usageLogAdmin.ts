@@ -34,6 +34,13 @@ export class UsageLogQueryError extends Error {
   }
 }
 
+/**
+ * 관리자 세션 서명 비밀키(ADMIN_SESSION_SECRET)가 없을 때 라우트가 503 으로 돌려주는 문구.
+ * 화면이 토큰 미설정 503 과 구분하는 기준이라 라우트와 화면이 같은 값을 쓴다.
+ */
+export const ADMIN_SESSION_NOT_CONFIGURED_MESSAGE =
+  '관리자 세션 비밀키가 설정되지 않았습니다.';
+
 // ─── 범위 보정 ───────────────────────────────────────────────────────────────
 export const USAGE_ADMIN_LIMITS = {
   DAYS_MIN: 1,

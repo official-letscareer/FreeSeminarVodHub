@@ -1,6 +1,7 @@
 jest.mock('@/lib/kv');
 
 import { GET } from '@/app/api/admin/usage-logs/route';
+import { createHmac } from 'node:crypto';
 import { NextRequest } from 'next/server';
 import { createAdminSession } from '@/lib/adminSession';
 import { getUsageRecent, getUsageSummary, getUsageUsers } from '@/lib/kv';
@@ -21,7 +22,10 @@ const BASE = 'http://localhost/api/admin/usage-logs';
 const TOKEN = 'b'.repeat(64);
 
 /** 로그인 직후와 같은 상태: admin_verified 와 서명된 admin_session. */
-function adminReq(query = '', session = createAdminSession()): NextRequest {
+function adminReq(
+  query = '',
+  session: string | null = createAdminSession(),
+): NextRequest {
   const req = new NextRequest(`${BASE}${query}`);
   req.cookies.set('admin_verified', '1');
   if (session) req.cookies.set('admin_session', session);
@@ -30,11 +34,14 @@ function adminReq(query = '', session = createAdminSession()): NextRequest {
 
 const originalToken = process.env.USAGE_LOG_READ_TOKEN;
 const originalPassword = process.env.ADMIN_PASSWORD;
+const originalSecret = process.env.ADMIN_SESSION_SECRET;
+const SESSION_SECRET = 'usage-session-secret-'.repeat(2);
 
 beforeEach(() => {
   jest.clearAllMocks();
   process.env.USAGE_LOG_READ_TOKEN = TOKEN;
   process.env.ADMIN_PASSWORD = 'test-admin-password';
+  process.env.ADMIN_SESSION_SECRET = SESSION_SECRET;
   jest.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -47,6 +54,8 @@ afterAll(() => {
   else process.env.USAGE_LOG_READ_TOKEN = originalToken;
   if (originalPassword === undefined) delete process.env.ADMIN_PASSWORD;
   else process.env.ADMIN_PASSWORD = originalPassword;
+  if (originalSecret === undefined) delete process.env.ADMIN_SESSION_SECRET;
+  else process.env.ADMIN_SESSION_SECRET = originalSecret;
 });
 
 describe('GET /api/admin/usage-logs 인증', () => {
@@ -107,13 +116,68 @@ describe('GET /api/admin/usage-logs 인증', () => {
     expect(mockSummary).not.toHaveBeenCalled();
   });
 
-  it('비밀번호가 바뀌면 이전에 발급된 세션은 401 이다', async () => {
+  it('비밀키가 바뀌면 이전에 발급된 세션은 401 이다', async () => {
     const session = createAdminSession();
-    process.env.ADMIN_PASSWORD = 'changed-password';
+    process.env.ADMIN_SESSION_SECRET = 'rotated-session-secret-'.repeat(2);
 
     const res = await GET(adminReq('?view=summary', session));
 
     expect(res.status).toBe(401);
+  });
+
+  it('ADMIN_PASSWORD 로 서명한 세션은 401 이다', async () => {
+    const expiresAt = Math.floor(Date.now() / 1000) + 3600;
+    const signature = createHmac('sha256', 'test-admin-password')
+      .update(`admin-session.v1.${expiresAt}`)
+      .digest('hex');
+
+    const res = await GET(
+      adminReq('?view=summary', `v1.${expiresAt}.${signature}`),
+    );
+
+    expect(res.status).toBe(401);
+    expect(mockSummary).not.toHaveBeenCalled();
+  });
+
+  describe('ADMIN_SESSION_SECRET 미설정', () => {
+    beforeEach(() => {
+      delete process.env.ADMIN_SESSION_SECRET;
+    });
+
+    it('로그인한 관리자에게는 503 과 원인 문구를 돌려준다', async () => {
+      const res = await GET(adminReq('?view=summary', null));
+
+      expect(res.status).toBe(503);
+      expect(await res.json()).toEqual({
+        message: '관리자 세션 비밀키가 설정되지 않았습니다.',
+      });
+      expect(res.headers.get('Cache-Control')).toBe('no-store');
+      expect(mockSummary).not.toHaveBeenCalled();
+    });
+
+    it('ADMIN_PASSWORD 만 있어도 세션이 만들어지지 않아 503 이다', async () => {
+      expect(createAdminSession()).toBeNull();
+
+      const res = await GET(adminReq('?view=summary'));
+
+      expect(res.status).toBe(503);
+    });
+
+    it('31자 비밀키는 설정되지 않은 것으로 보고 503 이다', async () => {
+      process.env.ADMIN_SESSION_SECRET = 'x'.repeat(31);
+
+      const res = await GET(adminReq('?view=summary', null));
+      const text = await res.text();
+
+      expect(res.status).toBe(503);
+      expect(text).not.toContain('31');
+    });
+
+    it('admin_verified 가 없으면 여전히 401 이다', async () => {
+      const res = await GET(new NextRequest(`${BASE}?view=summary`));
+
+      expect(res.status).toBe(401);
+    });
   });
 
   it('admin_verified=1 과 유효한 세션이 모두 있으면 통과한다', async () => {

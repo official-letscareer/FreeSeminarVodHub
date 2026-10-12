@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUsageRecent, getUsageSummary, getUsageUsers } from '@/lib/kv';
-import { ADMIN_SESSION_COOKIE, verifyAdminSession } from '@/lib/adminSession';
 import {
+  ADMIN_SESSION_COOKIE,
+  isAdminSessionConfigured,
+  verifyAdminSession,
+} from '@/lib/adminSession';
+import {
+  ADMIN_SESSION_NOT_CONFIGURED_MESSAGE,
   UsageLogForbiddenError,
   UsageLogNotConfiguredError,
   UsageLogQueryError,
@@ -11,11 +16,12 @@ import {
 
 // 다른 /api/admin/* 와 달리 서명 없는 admin_verified=1 만으로는 통과하지 못한다.
 // 로그인 때 발급된 서명 세션(admin_session)이 함께 있어야 한다.
-function isAdminAuthorized(request: NextRequest): boolean {
-  return (
-    request.cookies.get('admin_verified')?.value === '1' &&
-    verifyAdminSession(request.cookies.get(ADMIN_SESSION_COOKIE)?.value)
-  );
+function hasAdminVerifiedCookie(request: NextRequest): boolean {
+  return request.cookies.get('admin_verified')?.value === '1';
+}
+
+function hasValidAdminSession(request: NextRequest): boolean {
+  return verifyAdminSession(request.cookies.get(ADMIN_SESSION_COOKIE)?.value);
 }
 
 // 이용자 이름이 들어 있는 응답이라 어떤 응답도 캐시하지 않는다.
@@ -31,7 +37,14 @@ function respond(body: unknown, status = 200) {
  * 토큰이나 DB 오류 원문은 응답에 싣지 않는다. 오류는 고정 문구로만 돌려준다.
  */
 export async function GET(request: NextRequest) {
-  if (!isAdminAuthorized(request)) {
+  if (!hasAdminVerifiedCookie(request)) {
+    return respond({ message: '인증이 필요합니다.' }, 401);
+  }
+  // 비밀키 설정 상태는 로그인한 관리자에게만 알려 준다. 세션을 만들 수 없으니 401 과 구분한다.
+  if (!isAdminSessionConfigured()) {
+    return respond({ message: ADMIN_SESSION_NOT_CONFIGURED_MESSAGE }, 503);
+  }
+  if (!hasValidAdminSession(request)) {
     return respond({ message: '인증이 필요합니다.' }, 401);
   }
 

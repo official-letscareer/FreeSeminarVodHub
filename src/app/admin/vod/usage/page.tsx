@@ -6,7 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { usageEventLabel } from '@/lib/usageLogAdmin';
+import {
+  ADMIN_SESSION_NOT_CONFIGURED_MESSAGE,
+  usageEventLabel,
+} from '@/lib/usageLogAdmin';
 import type {
   UsageRecentEvent,
   UsageSummary,
@@ -20,6 +23,8 @@ const USERS_LIMIT = 100;
 
 const NOT_CONFIGURED_MESSAGE =
   '이용 로그 조회 토큰이 설정되지 않았습니다. 개발 담당자에게 환경변수 USAGE_LOG_READ_TOKEN 설정과 Supabase 토큰 해시 등록을 요청해 주세요.';
+const SESSION_NOT_CONFIGURED_MESSAGE =
+  '관리자 세션 비밀키가 설정되지 않았습니다. 개발 담당자에게 환경변수 ADMIN_SESSION_SECRET 설정을 요청해 주세요. 설정한 뒤에는 한 번 다시 로그인해야 합니다.';
 const LOAD_FAILED_MESSAGE = '이용 로그를 불러오지 못했습니다.';
 const EMPTY_MESSAGE = '이 기간에 기록된 데이터가 없습니다.';
 const EMPTY_RECENT_MESSAGE = '기록된 이벤트가 없습니다.';
@@ -184,11 +189,17 @@ export default function AdminVodUsagePage() {
         const failed = responses.find((res) => !res.ok);
         if (failed) {
           setData(null);
-          setError(
-            failed.status === 503
-              ? NOT_CONFIGURED_MESSAGE
-              : await readMessage(failed),
-          );
+          const message = await readMessage(failed);
+          if (failed.status !== 503) {
+            setError(message);
+          } else {
+            // 503 은 두 가지다. 서버 문구로 세션 비밀키 미설정과 조회 토큰 미설정을 구분한다.
+            setError(
+              message === ADMIN_SESSION_NOT_CONFIGURED_MESSAGE
+                ? SESSION_NOT_CONFIGURED_MESSAGE
+                : NOT_CONFIGURED_MESSAGE,
+            );
+          }
           return;
         }
 

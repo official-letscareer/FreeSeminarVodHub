@@ -353,7 +353,53 @@ describe('AdminVodUsagePage', () => {
       '이용 로그 조회 토큰이 설정되지 않았습니다.',
     );
     expect(alert).toHaveTextContent('USAGE_LOG_READ_TOKEN');
+    expect(alert).not.toHaveTextContent('ADMIN_SESSION_SECRET');
     expect(screen.queryByText('영상별')).not.toBeInTheDocument();
+  });
+
+  it('세션 비밀키 미설정 503 은 ADMIN_SESSION_SECRET 안내로 구분해 보여준다', async () => {
+    const notConfigured = jsonResponse(
+      { message: '관리자 세션 비밀키가 설정되지 않았습니다.' },
+      503,
+    );
+    mockApi({
+      summary: notConfigured,
+      recent: jsonResponse(
+        { message: '관리자 세션 비밀키가 설정되지 않았습니다.' },
+        503,
+      ),
+      users: jsonResponse(
+        { message: '관리자 세션 비밀키가 설정되지 않았습니다.' },
+        503,
+      ),
+    });
+
+    render(<AdminVodUsagePage />);
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(
+      '관리자 세션 비밀키가 설정되지 않았습니다.',
+    );
+    expect(alert).toHaveTextContent(
+      '개발 담당자에게 환경변수 ADMIN_SESSION_SECRET 설정을 요청해 주세요',
+    );
+    expect(alert).not.toHaveTextContent('USAGE_LOG_READ_TOKEN');
+    expect(screen.queryByText('영상별')).not.toBeInTheDocument();
+  });
+
+  it('503 본문을 읽을 수 없으면 토큰 설정 안내로 처리한다', async () => {
+    const unreadable = {
+      ok: false,
+      status: 503,
+      json: () => Promise.reject(new Error('not json')),
+    } as unknown as Response;
+    mockApi({ summary: unreadable });
+
+    render(<AdminVodUsagePage />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'USAGE_LOG_READ_TOKEN',
+    );
   });
 
   it('502 이면 서버가 준 문구를 보여준다', async () => {

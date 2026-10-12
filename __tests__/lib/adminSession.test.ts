@@ -2,13 +2,16 @@ import { createHmac } from 'node:crypto';
 import {
   ADMIN_SESSION_MAX_AGE_SEC,
   createAdminSession,
+  isAdminSessionConfigured,
   verifyAdminSession,
 } from '@/lib/adminSession';
 
-const SECRET = 'test-admin-password';
+// 서명 키는 ADMIN_SESSION_SECRET 이다. 32자 이상(openssl rand -hex 32 는 64자)이어야 쓴다.
+const SECRET = 'a1b2c3d4'.repeat(8);
 const NOW = new Date('2026-10-12T00:00:00Z');
 const NOW_SEC = Math.floor(NOW.getTime() / 1000);
 
+const originalSecret = process.env.ADMIN_SESSION_SECRET;
 const originalPassword = process.env.ADMIN_PASSWORD;
 
 function hmac(secret: string, expiresAt: number | string): string {
@@ -18,10 +21,14 @@ function hmac(secret: string, expiresAt: number | string): string {
 }
 
 beforeEach(() => {
-  process.env.ADMIN_PASSWORD = SECRET;
+  process.env.ADMIN_SESSION_SECRET = SECRET;
+  // 로그인 비밀번호는 서명에 쓰이지 않는다. 일부러 다른 값으로 둔다.
+  process.env.ADMIN_PASSWORD = 'pw1234';
 });
 
 afterAll(() => {
+  if (originalSecret === undefined) delete process.env.ADMIN_SESSION_SECRET;
+  else process.env.ADMIN_SESSION_SECRET = originalSecret;
   if (originalPassword === undefined) delete process.env.ADMIN_PASSWORD;
   else process.env.ADMIN_PASSWORD = originalPassword;
 });
@@ -34,11 +41,46 @@ describe('createAdminSession', () => {
     expect(value).toBe(`v1.${expiresAt}.${hmac(SECRET, expiresAt)}`);
   });
 
-  it.each([[undefined], ['']])('ADMIN_PASSWORD 가 %p 이면 null 이다', (pw) => {
-    if (pw === undefined) delete process.env.ADMIN_PASSWORD;
-    else process.env.ADMIN_PASSWORD = pw;
+  it.each([
+    ['없음', undefined],
+    ['빈 문자열', ''],
+    ['공백뿐', ' '.repeat(40)],
+    ['31자', 'x'.repeat(31)],
+    ['공백을 빼면 31자', `  ${'x'.repeat(31)}  `],
+  ])('ADMIN_SESSION_SECRET 이 %s 이면 null 이다', (_label, secret) => {
+    if (secret === undefined) delete process.env.ADMIN_SESSION_SECRET;
+    else process.env.ADMIN_SESSION_SECRET = secret;
 
     expect(createAdminSession(NOW)).toBeNull();
+    expect(isAdminSessionConfigured()).toBe(false);
+  });
+
+  it('32자는 쓸 수 있고 앞뒤 공백은 키에 포함하지 않는다', () => {
+    const key = 'k'.repeat(32);
+    process.env.ADMIN_SESSION_SECRET = `  ${key}\n`;
+
+    const value = createAdminSession(NOW)!;
+    const expiresAt = NOW_SEC + ADMIN_SESSION_MAX_AGE_SEC;
+
+    expect(isAdminSessionConfigured()).toBe(true);
+    expect(value).toBe(`v1.${expiresAt}.${hmac(key, expiresAt)}`);
+  });
+
+  it('ADMIN_PASSWORD 만 있고 ADMIN_SESSION_SECRET 이 없으면 세션을 만들지 않는다', () => {
+    delete process.env.ADMIN_SESSION_SECRET;
+    process.env.ADMIN_PASSWORD = 'x'.repeat(64);
+
+    expect(createAdminSession(NOW)).toBeNull();
+    expect(isAdminSessionConfigured()).toBe(false);
+  });
+
+  it('서명에 ADMIN_PASSWORD 를 쓰지 않는다', () => {
+    const value = createAdminSession(NOW)!;
+    const expiresAt = NOW_SEC + ADMIN_SESSION_MAX_AGE_SEC;
+
+    expect(value.endsWith(hmac(process.env.ADMIN_PASSWORD!, expiresAt))).toBe(
+      false,
+    );
   });
 });
 
@@ -75,35 +117,46 @@ describe('verifyAdminSession', () => {
     expect(verifyAdminSession(extended, NOW)).toBe(false);
   });
 
-  it('다른 비밀번호로 만든 세션은 거절한다', () => {
+  it('다른 비밀키로 만든 세션은 거절한다', () => {
     const expiresAt = NOW_SEC + 1000;
-    const forged = `v1.${expiresAt}.${hmac('other-password', expiresAt)}`;
+    const forged = `v1.${expiresAt}.${hmac('z'.repeat(40), expiresAt)}`;
 
     expect(verifyAdminSession(forged, NOW)).toBe(false);
   });
 
-  it('발급 뒤 비밀번호가 바뀌면 기존 세션은 무효다', () => {
+  it('ADMIN_PASSWORD 로 서명한 값은 거절한다', () => {
+    const expiresAt = NOW_SEC + 1000;
+    const forged = `v1.${expiresAt}.${hmac(process.env.ADMIN_PASSWORD!, expiresAt)}`;
+
+    expect(verifyAdminSession(forged, NOW)).toBe(false);
+  });
+
+  it('발급 뒤 비밀키가 바뀌면 기존 세션은 무효다', () => {
     const value = createAdminSession(NOW);
-    process.env.ADMIN_PASSWORD = 'changed-password';
+    process.env.ADMIN_SESSION_SECRET = 'changed-secret-'.repeat(3);
 
     expect(verifyAdminSession(value, NOW)).toBe(false);
   });
 
-  it.each([[undefined], ['']])(
-    'ADMIN_PASSWORD 가 %p 이면 어떤 값도 거절한다',
-    (pw) => {
-      const value = createAdminSession(NOW)!;
-      if (pw === undefined) delete process.env.ADMIN_PASSWORD;
-      else process.env.ADMIN_PASSWORD = pw;
+  it.each([
+    ['없음', undefined],
+    ['빈 문자열', ''],
+    ['31자', 'x'.repeat(31)],
+  ])('ADMIN_SESSION_SECRET 이 %s 이면 어떤 값도 거절한다', (_label, secret) => {
+    const value = createAdminSession(NOW)!;
+    if (secret === undefined) delete process.env.ADMIN_SESSION_SECRET;
+    else process.env.ADMIN_SESSION_SECRET = secret;
 
-      expect(verifyAdminSession(value, NOW)).toBe(false);
-      // 빈 비밀번호로 서명한 값을 만들어도 통과하지 않는다.
-      const expiresAt = NOW_SEC + 1000;
-      expect(
-        verifyAdminSession(`v1.${expiresAt}.${hmac('', expiresAt)}`, NOW),
-      ).toBe(false);
-    },
-  );
+    expect(verifyAdminSession(value, NOW)).toBe(false);
+    // 짧은 키로 서명한 값을 만들어도 통과하지 않는다.
+    const expiresAt = NOW_SEC + 1000;
+    expect(
+      verifyAdminSession(
+        `v1.${expiresAt}.${hmac(secret ?? '', expiresAt)}`,
+        NOW,
+      ),
+    ).toBe(false);
+  });
 
   it.each([
     ['빈 문자열', ''],

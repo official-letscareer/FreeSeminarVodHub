@@ -107,9 +107,11 @@ const mockVodList = [
 describe('POST /api/admin/auth', () => {
   beforeAll(() => {
     process.env.ADMIN_PASSWORD = 'test-secret';
+    process.env.ADMIN_SESSION_SECRET = 'session-secret-'.repeat(3);
   });
   afterAll(() => {
     delete process.env.ADMIN_PASSWORD;
+    delete process.env.ADMIN_SESSION_SECRET;
   });
 
   it('올바른 비밀번호 → 200 + 쿠키 설정', async () => {
@@ -140,6 +142,32 @@ describe('POST /api/admin/auth', () => {
     expect(sessionCookie).toMatch(
       new RegExp(`Max-Age=${ADMIN_SESSION_MAX_AGE_SEC}`),
     );
+  });
+
+  it('ADMIN_SESSION_SECRET 이 없으면 로그인은 성공하되 admin_session 은 만들지 않음', async () => {
+    const saved = process.env.ADMIN_SESSION_SECRET;
+    delete process.env.ADMIN_SESSION_SECRET;
+    try {
+      const res = await adminAuthPost(makeRequest({ password: 'test-secret' }));
+
+      expect(res.status).toBe(200);
+      expect(res.cookies.get('admin_verified')?.value).toBe('1');
+      expect(res.cookies.get('admin_session')).toBeUndefined();
+    } finally {
+      process.env.ADMIN_SESSION_SECRET = saved;
+    }
+  });
+
+  it('ADMIN_PASSWORD 가 서명 키로 쓰이지 않는다', async () => {
+    const saved = process.env.ADMIN_SESSION_SECRET;
+    delete process.env.ADMIN_SESSION_SECRET;
+    try {
+      const res = await adminAuthPost(makeRequest({ password: 'test-secret' }));
+
+      expect(res.cookies.get('admin_session')).toBeUndefined();
+    } finally {
+      process.env.ADMIN_SESSION_SECRET = saved;
+    }
   });
 
   it('틀린 비밀번호 → 어떤 쿠키도 설정하지 않음', async () => {
