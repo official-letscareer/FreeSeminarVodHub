@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,10 @@ import VodCard from '@/components/vod-card';
 import VodListItem from '@/components/vod-list-item';
 import BannerCarousel from '@/components/banner-carousel';
 import PageBackdrop from '@/components/page-backdrop';
+import VodPassActivationDialog, {
+  InactivePassInfo,
+  readInactivePass,
+} from '@/components/vod-pass-activation-dialog';
 import { VodItem } from '@/lib/types';
 
 type ViewMode = 'grid' | 'list';
@@ -21,6 +25,11 @@ export default function VodListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  // 비활성 이용권(LC-3438). 값이 있으면 목록 대신 활성화 안내를 보여준다.
+  const [inactivePass, setInactivePass] = useState<InactivePassInfo | null>(
+    null,
+  );
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
     // localStorage는 서버 렌더 시점엔 없어서 lazy initializer로 옮길 수 없다 —
@@ -30,11 +39,18 @@ export default function VodListPage() {
     if (saved === 'list' || saved === 'grid') setViewMode(saved);
   }, []);
 
-  useEffect(() => {
-    fetch('/api/vod')
-      .then((res) => {
+  const loadVods = useCallback(() => {
+    return fetch('/api/vod')
+      .then(async (res) => {
         if (res.status === 401) {
           router.push('/login');
+          return null;
+        }
+        // 이용권은 있지만 활성화 전이다. 로그인 문제가 아니므로 /login 으로 보내지 않는다.
+        const inactive = await readInactivePass(res);
+        if (inactive) {
+          setInactivePass(inactive);
+          setDialogOpen(true);
           return null;
         }
         if (!res.ok) throw new Error('불러오기 실패');
@@ -46,6 +62,18 @@ export default function VodListPage() {
       .catch(() => setError('VOD 목록을 불러오지 못했습니다.'))
       .finally(() => setLoading(false));
   }, [router]);
+
+  useEffect(() => {
+    void loadVods();
+  }, [loadVods]);
+
+  function handleActivated() {
+    setDialogOpen(false);
+    setInactivePass(null);
+    setError('');
+    setLoading(true);
+    void loadVods();
+  }
 
   function handleLogout() {
     document.cookie = 'auth_verified=; Max-Age=0; path=/';
@@ -132,6 +160,15 @@ export default function VodListPage() {
               </div>
             ))}
           </div>
+        ) : inactivePass ? (
+          <div className="mt-12 flex flex-col items-center gap-4">
+            <p className="text-center text-sm text-gray-500">
+              이용권을 활성화하면 시청할 수 있습니다
+            </p>
+            <Button onClick={() => setDialogOpen(true)}>
+              이용권 활성화하기
+            </Button>
+          </div>
         ) : vods.length === 0 ? (
           <p className="text-center text-sm text-gray-500 mt-12">
             등록된 VOD가 없습니다.
@@ -150,6 +187,15 @@ export default function VodListPage() {
           </div>
         )}
       </main>
+
+      {inactivePass && dialogOpen && (
+        <VodPassActivationDialog
+          pass={inactivePass.pass}
+          inactiveCount={inactivePass.inactiveCount}
+          onActivated={handleActivated}
+          onLater={() => setDialogOpen(false)}
+        />
+      )}
     </div>
   );
 }
