@@ -140,7 +140,10 @@ describe('POST /api/vod/log', () => {
 
   it('검증에 실패하면 400', async () => {
     const res = await POST(
-      makeReq({ sessionId: 's', events: [{ type: 'nope' }] }, { verified: true }),
+      makeReq(
+        { sessionId: 's', events: [{ type: 'nope' }] },
+        { verified: true },
+      ),
     );
 
     expect(res.status).toBe(400);

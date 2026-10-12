@@ -122,7 +122,8 @@ function readDetail(value: unknown): UsageDetail | Rejected {
       item === null ||
       typeof item === 'boolean' ||
       (typeof item === 'number' && Number.isFinite(item)) ||
-      (typeof item === 'string' && item.length <= USAGE_LIMITS.DETAIL_STRING_MAX);
+      (typeof item === 'string' &&
+        item.length <= USAGE_LIMITS.DETAIL_STRING_MAX);
     if (!valid) return REJECTED;
     detail[key] = item as UsageDetailValue;
   }
@@ -234,13 +235,18 @@ export function sanitizeUsageBatch(
   }
   if (
     !isAbsent(userName) &&
-    !(typeof userName === 'string' && userName.length <= USAGE_LIMITS.USER_NAME_MAX)
+    !(
+      typeof userName === 'string' &&
+      userName.length <= USAGE_LIMITS.USER_NAME_MAX
+    )
   ) {
     return null;
   }
   if (
     !isAbsent(userKey) &&
-    !(typeof userKey === 'string' && userKey.length <= USAGE_LIMITS.USER_KEY_MAX)
+    !(
+      typeof userKey === 'string' && userKey.length <= USAGE_LIMITS.USER_KEY_MAX
+    )
   ) {
     return null;
   }

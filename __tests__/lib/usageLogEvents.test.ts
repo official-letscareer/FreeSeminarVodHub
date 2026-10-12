@@ -27,7 +27,13 @@ describe('sanitizeUsageBatch', () => {
             positionSec: 12.34,
             durationSec: 600,
             watchedSec: 9.96,
-            detail: { from_sec: 10, to_sec: 25, method: 'skip', on: true, x: null },
+            detail: {
+              from_sec: 10,
+              to_sec: 25,
+              method: 'skip',
+              on: true,
+              x: null,
+            },
             occurredAt: '2026-10-12T02:59:00.000Z',
           },
         ],
@@ -49,7 +55,13 @@ describe('sanitizeUsageBatch', () => {
           positionSec: 12.3,
           durationSec: 600,
           watchedSec: 10,
-          detail: { from_sec: 10, to_sec: 25, method: 'skip', on: true, x: null },
+          detail: {
+            from_sec: 10,
+            to_sec: 25,
+            method: 'skip',
+            on: true,
+            x: null,
+          },
           occurredAt: '2026-10-12T02:59:00.000Z',
         },
       ],
@@ -131,7 +143,9 @@ describe('sanitizeUsageBatch', () => {
       expect(
         sanitizeUsageBatch(batch(events, { userKey: 'a'.repeat(65) }), NOW),
       ).toBeNull();
-      expect(sanitizeUsageBatch(batch(events, { userName: 1 }), NOW)).toBeNull();
+      expect(
+        sanitizeUsageBatch(batch(events, { userName: 1 }), NOW),
+      ).toBeNull();
     });
   });
 
@@ -174,11 +188,14 @@ describe('sanitizeUsageBatch', () => {
       ['durationSec NaN', { durationSec: Number.NaN }],
       ['watchedSec 문자열', { watchedSec: '10' }],
       ['detail 배열', { detail: [1] }],
-      ['detail 키 21개', {
-        detail: Object.fromEntries(
-          Array.from({ length: 21 }, (_, i) => [`k${i}`, i]),
-        ),
-      }],
+      [
+        'detail 키 21개',
+        {
+          detail: Object.fromEntries(
+            Array.from({ length: 21 }, (_, i) => [`k${i}`, i]),
+          ),
+        },
+      ],
       ['detail 값이 객체', { detail: { a: { b: 1 } } }],
       ['detail 값이 배열', { detail: { a: [1] } }],
       ['detail 문자열 101자', { detail: { a: 'x'.repeat(101) } }],
@@ -215,7 +232,11 @@ describe('sanitizeUsageBatch', () => {
     });
 
     it('소수 첫째 자리까지 반올림한다', () => {
-      const result = one({ positionSec: 1.25, durationSec: 2.04, watchedSec: 0.06 });
+      const result = one({
+        positionSec: 1.25,
+        durationSec: 2.04,
+        watchedSec: 0.06,
+      });
 
       expect(result?.events[0]).toMatchObject({
         positionSec: 1.3,
@@ -237,7 +258,9 @@ describe('sanitizeUsageBatch', () => {
     });
 
     it('24시간보다 오래됐거나 1시간보다 미래이면 서버 시각으로 대체한다', () => {
-      const tooOld = new Date(NOW.getTime() - 24 * 60 * 60 * 1000 - 1).toISOString();
+      const tooOld = new Date(
+        NOW.getTime() - 24 * 60 * 60 * 1000 - 1,
+      ).toISOString();
       const tooNew = new Date(NOW.getTime() + 60 * 60 * 1000 + 1).toISOString();
 
       expect(one({ occurredAt: tooOld })?.events[0].occurredAt).toBe(serverNow);

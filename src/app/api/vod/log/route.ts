@@ -45,7 +45,9 @@ export async function POST(request: NextRequest) {
       if (!profile) return unauthorized();
       authMethod = 'sso';
       userName = profile.name;
-      userKey = createHash('sha256').update(`sso:${profile.name}`).digest('hex');
+      userKey = createHash('sha256')
+        .update(`sso:${profile.name}`)
+        .digest('hex');
     } else {
       // 이름+전화번호 로그인은 서버가 이름을 알 수 없어 클라이언트 값을 그대로 쓴다.
       authMethod = 'verified';
