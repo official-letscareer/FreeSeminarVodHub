@@ -320,8 +320,16 @@ DELETE FROM vod_usage_logs WHERE occurred_at < NOW() - INTERVAL '180 days';
 | `users` | `vod_usage_users(p_token, p_days, p_limit)` | 사용자별 시청 요약, 시청 시간 내림차순 |
 
 - `days` 는 정수 1~180(기본 30), `limit` 은 1~200(기본 100)으로 보정한다. 잘못된 `view` 는 400 이다.
-- 인증은 다른 `/api/admin/*` 라우트와 같다. `admin_verified=1` 쿠키가 없으면 401 이다. `/admin/vod` 접두는
-  미들웨어(`src/middleware.ts`)도 같은 쿠키로 보호한다.
+- 인증은 `admin_verified=1` 쿠키에 더해 서명된 `admin_session` 쿠키가 있어야 한다. 둘 중 하나라도 없거나
+  서명이 틀리거나 만료됐으면 401 이다. `admin_verified=1` 만 직접 만들어 넣은 요청은 통과하지 못한다.
+  `/admin/vod` 접두는 미들웨어(`src/middleware.ts`)가 `admin_verified` 존재만으로 보호하며, 이 화면의 데이터
+  보호는 위 API 가 맡는다.
+- `admin_session` 은 `/api/admin/auth` 로그인 성공 때 `admin_verified` 와 함께 발급되는 httpOnly 쿠키다.
+  값은 `v1.<만료 epoch 초>.<HMAC-SHA256 hex>` 이고, HMAC 메시지는 `admin-session.v1.<만료 epoch 초>`, 키는
+  `ADMIN_PASSWORD` 다(`src/lib/adminSession.ts`). 새 환경변수는 없다. 수명은 24시간이고 쿠키 `maxAge` 와
+  서명 안의 만료 시각이 같다. 비밀번호를 바꾸면 기존 세션이 모두 무효가 된다. 로그아웃은 두 쿠키를 함께 지운다.
+- 이 기능을 배포하기 전에 로그인해 있던 관리자는 `admin_session` 이 없어 이 화면에서 401 을 받고 `/admin`
+  으로 돌아간다. 배포 뒤 한 번 다시 로그인하면 된다.
 - 응답 코드: 성공 200, 토큰 환경변수 없음 503, 토큰 불일치(SQLSTATE 42501) 502, 그 밖의 RPC 오류 502.
   본문에는 고정 문구만 싣는다. 토큰이나 DB 오류 원문은 싣지 않는다. 모든 응답에 `Cache-Control: no-store` 를
   붙인다.
@@ -362,7 +370,11 @@ INSERT INTO vod_usage_log_reader (token_hash) VALUES ('<2번의 해시>');
   무너진다.
 - 토큰이 유출되면 누구나 집계와 최근 200건(사용자 이름 포함)을 읽을 수 있다. 의심되면 바로 교체한다. 함수는
   원본 전체를 내보내지 않으며 `user_agent` 는 돌려주지 않는다.
-- 이 라우트와 화면은 `admin_verified` 쿠키만 본다. 관리자 비밀번호 인증의 강도가 그대로 한계다.
+- 서명된 세션은 이 라우트에만 적용했다. 다른 관리자 API(`/api/admin/vod`, `users`, `premium-users`, `banners`,
+  `access-settings` 와 그 하위 CSV 업로드·템플릿)는 아직 서명되지 않은 `admin_verified=1` 쿠키만 본다(알려진
+  한계). 쿠키를 직접 만들어 넣으면 통과하며, 예외 유저와 프리미엄 명단의 이름·전화번호가 이 경로로 읽힌다.
+- 서명 키가 `ADMIN_PASSWORD` 라 비밀번호가 약하면 세션 서명도 약하다. 관리자 비밀번호 인증의 강도가 그대로
+  한계다.
 
 ---
 
@@ -590,7 +602,7 @@ KV_REST_API_URL=
 KV_REST_API_TOKEN=
 KV_REST_API_READ_ONLY_TOKEN=
 
-# 관리자
+# 관리자. 이용 로그 조회용 세션(admin_session)의 서명 키로도 쓴다. 바꾸면 기존 관리자 세션이 무효가 된다.
 ADMIN_PASSWORD=
 
 # 이용 로그 사용자 키(LC-3438, 5.6). 서버 전용. NEXT_PUBLIC_ 접두어를 붙이지 않는다.
