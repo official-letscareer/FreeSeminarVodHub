@@ -178,6 +178,101 @@ SSO 로그인 사용자의 판정은 다음과 같다(`src/lib/vodAccess.ts`).
 
 새 환경변수는 없다. 이용권 조회·활성화 호출도 기존 `LETSCAREER_API_URL` 을 쓴다.
 
+### 5.6 이용 로그 (LC-3438)
+
+사용자가 VOD 사이트에서 무엇을 했는지(어떤 영상을 재생했는지, 재생하다 멈췄는지, 어디까지 봤는지,
+페이지만 이동했는지)를 Supabase `vod_usage_logs` 테이블에 남긴다. 테이블 정의는
+`docs/supabase-usage-log.sql` 이다. 이 레포가 실행하지 않으며, 사람이 Supabase SQL Editor 에서 한 번
+실행한다. 테이블이 없어도 사이트는 정상 동작한다. 로그 저장만 실패하고 서버 로그에 남는다.
+
+저장하는 항목은 다음과 같다.
+
+| 항목 | 컬럼 | 비고 |
+|------|------|------|
+| 이벤트 종류 | `event_type` | 아래 이벤트 표 |
+| 발생 시각, 수신 시각 | `occurred_at`, `created_at` | 발생 시각이 서버 시각 기준 -24시간 ~ +1시간을 벗어나면 서버 시각으로 대체 |
+| 탭 단위 세션 | `session_id` | sessionStorage 의 난수. 탭을 닫으면 사라진다 |
+| 인증 방식 | `auth_method` | `sso` 또는 `verified`(이름+전화번호, 예외 유저, 프리미엄 명단) |
+| 이름 | `user_name` | SSO 프로필 이름 또는 이름+전화번호 로그인에 입력한 이름 |
+| 사용자 키 | `user_key` | SSO 는 SHA-256(`sso:` + 이름), 이름+전화번호는 SHA-256(`이름:전화번호`) |
+| 영상 | `vod_id`, `youtube_id` | |
+| 페이지 | `page_path` | 쿼리 스트링을 뺀 경로(`/vod`, `/vod/12`) |
+| 재생 위치, 영상 길이, 누적 시청 시간 | `position_sec`, `duration_sec`, `watched_sec` | 소수 첫째 자리, 초 단위 |
+| 이벤트별 부가 값 | `detail` | JSONB |
+| 브라우저 | `user_agent` | 200자까지 |
+
+저장하지 않는 항목은 다음과 같다.
+
+- 전화번호 원문. 이름+전화번호 로그인은 브라우저가 SHA-256 해시만 만들어 보낸다. `crypto.subtle` 을 쓸
+  수 없는 환경(HTTPS 가 아닌 주소 등)에서는 `user_key` 가 비고 이름만 남는다.
+- IP 주소.
+- 이용권 자격 판정 결과와 접근 거부 사유.
+
+누적 시청 시간(`watched_sec`)은 재생 상태로 있었던 실제 경과 시간의 합이다. 재생 위치의 차이로 계산하지
+않으므로 건너뛰기와 되감기는 들어가지 않고, 버퍼링 시간도 세지 않는다.
+
+이벤트는 다음과 같다. 이 목록 밖의 값은 서버가 거절한다.
+
+| event_type | 발생 시점 | detail |
+|------------|-----------|--------|
+| `page_view` | `/vod` 를 열었을 때, `/vod/[id]` 에서 영상이 로드됐을 때 | 없음 |
+| `page_leave` | 페이지를 떠나거나 탭을 닫을 때 | `dwell_sec`(머문 시간) |
+| `video_ready` | YouTube 플레이어가 준비됐을 때 | 없음 |
+| `video_play` | 재생을 시작했을 때. 버퍼링 뒤 자동 재개는 세지 않는다 | 없음 |
+| `video_pause` | 일시정지했을 때 | 없음 |
+| `video_ended` | 끝까지 재생했을 때 | 없음 |
+| `video_seek` | 10초 건너뛰기, 진행 바 이동. 진행 바를 끄는 동안은 하나로 묶어 마지막 위치만 남긴다 | `from_sec`, `to_sec`, `method`(`skip` 또는 `scrub`) |
+| `video_rate_change` | 배속을 바꿨을 때 | `rate` |
+| `video_fullscreen` | 전체화면을 켜거나 껐을 때 | `on` |
+| `video_progress` | 재생 중 30초마다 | 없음 |
+| `video_leave` | 영상 화면을 떠날 때. 마지막 위치와 누적 시청 시간 | 없음 |
+| `pass_prompt_shown` | 이용권 활성화 안내 모달이 열렸을 때 | 없음 |
+| `pass_activated` | 이용권 활성화에 성공했을 때 | 없음 |
+| `pass_activate_failed` | 이용권 활성화에 실패했을 때 | `status`(HTTP 상태 코드, 응답을 받지 못했으면 0) |
+
+수집 흐름은 다음과 같다.
+
+1. 브라우저(`src/lib/usageLog.ts`)가 이벤트를 큐에 쌓고, 5초 뒤 또는 20개가 되면
+   `POST /api/vod/log` 로 보낸다. 탭이 숨겨지거나 페이지를 떠날 때는 `navigator.sendBeacon` 으로 즉시
+   보낸다. 실패하면 조용히 버리고 다시 보내지 않는다. 재생과 화면 동작에는 영향이 없다.
+2. 서버(`src/app/api/vod/log/route.ts`)가 `sanitizeUsageBatch`(`src/lib/usageLogEvents.ts`)로 본문을
+   검증한다. 규칙을 어긴 이벤트는 버리고 나머지는 남긴다. 한 번에 이벤트 1~50개, `detail` 은 키 20개
+   이내, 값은 문자열(100자 이내)·숫자·불리언·null 만 받는다.
+3. 인증은 쿠키로 판단한다. 이용권 자격(`canWatchVod` 등)은 검사하지 않는다.
+   - SSO 토큰 쿠키가 있으면 렛츠커리어 서버로 프로필을 확인해 그 이름을 쓴다. 클라이언트가 보낸 이름과
+     키는 무시한다. 프로필을 받지 못하면 401 이다.
+   - SSO 쿠키가 없고 `auth_verified=1` 이면 클라이언트가 보낸 이름과 키를 그대로 저장한다.
+   - 둘 다 없으면 401 이다.
+4. `kv.insertUsageLogs` 가 여러 행을 한 번에 insert 한다.
+
+응답은 저장 성공 204, 본문 오류 400, 인증 없음 401, 저장소 오류나 테이블 없음 202(`{"ok":false}`)이다.
+어떤 경우에도 500 을 내지 않는다.
+
+이름+전화번호 로그인 사용자의 이름과 키는 브라우저가 보낸 값이라 위조될 수 있다. 이 경로는 서버가 이름을
+확인할 수단이 없다. 분석용 참고 값으로만 본다.
+
+`vod_usage_logs` 는 RLS 를 켜고 anon, authenticated 에 INSERT 만 허용한다(SELECT 정책이 없다). 이 사이트는
+`NEXT_PUBLIC_*` 공개 키로 Supabase 에 접근하므로, SELECT 를 열면 브라우저에 실린 키만으로 이용자 이름이
+들어 있는 로그를 읽을 수 있다. 기존 테이블이 RLS 를 꺼 둔 방식과 일부러 다르게 했다. 같은 이유로
+`insertUsageLogs` 는 insert 뒤에 `.select()` 를 붙이지 않는다. 삽입한 행을 되읽으려는 요청은 SELECT 정책이
+없어 실패한다.
+
+로그 조회는 Supabase 대시보드(Table Editor, SQL Editor)에서 한다. 영상별 재생 횟수와 한 세션의 시간순
+흐름을 보는 예시 쿼리는 `docs/supabase-usage-log.sql` 하단에 있다. 로그는 자동으로 지워지지 않으므로
+180일이 지난 행은 주기적으로 직접 지운다.
+
+```sql
+DELETE FROM vod_usage_logs WHERE occurred_at < NOW() - INTERVAL '180 days';
+```
+
+한계는 다음과 같다.
+
+- 탭을 강제 종료하거나 모바일에서 브라우저가 백그라운드 상태로 종료되면 마지막 이벤트(`page_leave`,
+  `video_leave`)가 남지 않을 수 있다. 이 경우 마지막 `video_progress` 가 가장 가까운 기록이다.
+- 광고 차단 확장 프로그램이 `/api/vod/log` 요청을 막으면 그 사용자의 로그는 남지 않는다.
+- 렛츠커리어 로그인 사용자의 로그 배치마다 렛츠커리어 서버로 프로필 조회가 한 번 나간다. 배치는 최소 5초
+  간격이다.
+
 ---
 
 ## 6. API 설계
@@ -220,6 +315,7 @@ SSO 로그인 사용자의 판정은 다음과 같다(`src/lib/vodAccess.ts`).
 | `GET` | `/api/vod` | VOD 목록 조회 | 세션 |
 | `GET` | `/api/vod/:id` | VOD 단건 조회 | 세션 |
 | `POST` | `/api/vod/pass/activate` | VOD 이용권 활성화 (LC-3438, 5.5) | SSO 토큰 |
+| `POST` | `/api/vod/log` | VOD 이용 로그 수집 (LC-3438, 5.6) | SSO 토큰 또는 세션 |
 | `POST` | `/api/admin/auth` | 관리자 비밀번호 인증 | 없음 |
 | `GET` | `/api/admin/vod` | [관리자] VOD 목록 조회 | Admin |
 | `POST` | `/api/admin/vod` | [관리자] VOD 추가 | Admin |
