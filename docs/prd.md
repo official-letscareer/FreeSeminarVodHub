@@ -325,12 +325,22 @@ DELETE FROM vod_usage_logs WHERE occurred_at < NOW() - INTERVAL '180 days';
   `/admin/vod` 접두는 미들웨어(`src/middleware.ts`)가 `admin_verified` 존재만으로 보호하며, 이 화면의 데이터
   보호는 위 API 가 맡는다.
 - `admin_session` 은 `/api/admin/auth` 로그인 성공 때 `admin_verified` 와 함께 발급되는 httpOnly 쿠키다.
-  값은 `v1.<만료 epoch 초>.<HMAC-SHA256 hex>` 이고, HMAC 메시지는 `admin-session.v1.<만료 epoch 초>`, 키는
-  `ADMIN_PASSWORD` 다(`src/lib/adminSession.ts`). 새 환경변수는 없다. 수명은 24시간이고 쿠키 `maxAge` 와
-  서명 안의 만료 시각이 같다. 비밀번호를 바꾸면 기존 세션이 모두 무효가 된다. 로그아웃은 두 쿠키를 함께 지운다.
-- 이 기능을 배포하기 전에 로그인해 있던 관리자는 `admin_session` 이 없어 이 화면에서 401 을 받고 `/admin`
-  으로 돌아간다. 배포 뒤 한 번 다시 로그인하면 된다.
-- 응답 코드: 성공 200, 토큰 환경변수 없음 503, 토큰 불일치(SQLSTATE 42501) 502, 그 밖의 RPC 오류 502.
+  값은 `v1.<만료 epoch 초>.<HMAC-SHA256 hex>` 이고, HMAC 메시지는 `admin-session.v1.<만료 epoch 초>` 다
+  (`src/lib/adminSession.ts`). 수명은 24시간이고 쿠키 `maxAge` 와 서명 안의 만료 시각이 같다. 로그아웃은 두
+  쿠키를 함께 지운다.
+- 서명 키는 전용 환경변수 `ADMIN_SESSION_SECRET`(서버 전용, `NEXT_PUBLIC_` 금지)이다. `ADMIN_PASSWORD` 를
+  서명에 쓰지 않고 폴백도 없다. 짧은 비밀번호를 서명 키로 쓰면 서명된 쿠키 하나만 새어도 오프라인 대입으로
+  비밀번호를 알아낼 수 있고, 같은 값을 로그인 비교와 서명에 겹쳐 쓰게 되기 때문이다. 값은
+  `openssl rand -hex 32`(64자)로 만든다. 앞뒤 공백을 뺀 길이가 32자 미만이면 설정되지 않은 것으로 본다.
+  비밀키를 바꾸면 기존 세션이 모두 무효가 되어 다시 로그인해야 한다.
+- 비밀키가 설정되지 않은 동안: 관리자 로그인(`/api/admin/auth`)은 기존대로 성공하지만 `admin_session` 은
+  발급하지 않는다. 이 API 는 `admin_verified=1` 이 있는 요청에 401 이 아니라 503
+  `{"message":"관리자 세션 비밀키가 설정되지 않았습니다."}` 를 돌려주고, 화면은 `ADMIN_SESSION_SECRET` 설정을
+  요청하는 안내를 보여준다. `admin_verified` 가 없으면 이 경우에도 401 이다.
+- 이 기능을 배포하기 전에 로그인해 있던 관리자, 또는 비밀키를 처음 설정한 직후의 관리자는 `admin_session`
+  이 없어 이 화면에서 401 을 받고 `/admin` 으로 돌아간다. 한 번 다시 로그인하면 된다.
+- 응답 코드: 성공 200, 인증 없음·세션 무효 401, 세션 비밀키 없음 503, 조회 토큰 환경변수 없음 503, 토큰
+  불일치(SQLSTATE 42501) 502, 그 밖의 RPC 오류 502.
   본문에는 고정 문구만 싣는다. 토큰이나 DB 오류 원문은 싣지 않는다. 모든 응답에 `Cache-Control: no-store` 를
   붙인다.
 - 집계 의미는 수집 이벤트 기준이다. 재생 = `video_play`, 시청 횟수 = `video_leave`, 끝까지 본 횟수 =
@@ -373,8 +383,8 @@ INSERT INTO vod_usage_log_reader (token_hash) VALUES ('<2번의 해시>');
 - 서명된 세션은 이 라우트에만 적용했다. 다른 관리자 API(`/api/admin/vod`, `users`, `premium-users`, `banners`,
   `access-settings` 와 그 하위 CSV 업로드·템플릿)는 아직 서명되지 않은 `admin_verified=1` 쿠키만 본다(알려진
   한계). 쿠키를 직접 만들어 넣으면 통과하며, 예외 유저와 프리미엄 명단의 이름·전화번호가 이 경로로 읽힌다.
-- 서명 키가 `ADMIN_PASSWORD` 라 비밀번호가 약하면 세션 서명도 약하다. 관리자 비밀번호 인증의 강도가 그대로
-  한계다.
+- 관리자 로그인(`/api/admin/auth`) 자체는 그대로다. 비밀번호 입력 시도 횟수 제한이 없고, 비교는 상수 시간
+  비교가 아닌 일반 문자열 비교다. 이용 로그 화면의 보호 수준은 `ADMIN_PASSWORD` 의 강도에 여전히 좌우된다.
 
 ---
 
@@ -602,8 +612,13 @@ KV_REST_API_URL=
 KV_REST_API_TOKEN=
 KV_REST_API_READ_ONLY_TOKEN=
 
-# 관리자. 이용 로그 조회용 세션(admin_session)의 서명 키로도 쓴다. 바꾸면 기존 관리자 세션이 무효가 된다.
+# 관리자
 ADMIN_PASSWORD=
+
+# 관리자 세션(admin_session) 서명 키(LC-3438, 5.6). 서버 전용. NEXT_PUBLIC_ 접두어를 붙이지 않는다.
+# `openssl rand -hex 32` 로 만든다. ADMIN_PASSWORD 를 서명에 쓰지 않는다. 32자 미만이면 설정되지 않은 것으로 본다.
+# 비어 있으면 이용 로그 화면은 503 안내를 보여준다. 바꾸면 기존 관리자 세션이 무효가 된다.
+ADMIN_SESSION_SECRET=
 
 # 이용 로그 사용자 키(LC-3438, 5.6). 서버 전용. NEXT_PUBLIC_ 접두어를 붙이지 않는다.
 # 비어 있으면 이용 로그는 user_key, user_name 없이 세션 단위 익명으로 남는다.
