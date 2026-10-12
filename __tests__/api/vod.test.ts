@@ -1,11 +1,16 @@
 jest.mock('@/lib/kv');
 jest.mock('@/lib/sso');
+jest.mock('@/lib/vodPass', () => ({
+  ...jest.requireActual('@/lib/vodPass'),
+  getMyVodPasses: jest.fn(),
+}));
 
 import { GET as vodListGet } from '@/app/api/vod/route';
 import { GET as vodDetailGet } from '@/app/api/vod/[id]/route';
 import { NextRequest } from 'next/server';
 import { getEnabledVodList, getVodList, getAccessSettings } from '@/lib/kv';
 import { getSsoUserProfile, SSO_ACCESS_TOKEN_COOKIE } from '@/lib/sso';
+import { getMyVodPasses } from '@/lib/vodPass';
 import { AccessSettings } from '@/lib/types';
 
 const mockGetEnabledVodList = getEnabledVodList as jest.MockedFunction<
@@ -19,11 +24,20 @@ const mockGetAccessSettings = getAccessSettings as jest.MockedFunction<
   typeof getAccessSettings
 >;
 
+const mockGetMyVodPasses = getMyVodPasses as jest.MockedFunction<
+  typeof getMyVodPasses
+>;
+
 const OFF_SETTINGS: AccessSettings = {
   requireChallengeParticipation: false,
   requireChallengeOption: false,
   allowedOptionCodes: [],
   requireVodPass: false,
+};
+
+const PASS_GATE_ON: AccessSettings = {
+  ...OFF_SETTINGS,
+  requireVodPass: true,
 };
 
 function makeAuthReq(url: string): NextRequest {
@@ -215,6 +229,86 @@ describe('GET /api/vod', () => {
       expect(mockGetAccessSettings).not.toHaveBeenCalled();
     });
   });
+  describe('이용권 게이트(LC-3438)', () => {
+    beforeEach(() => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-10-12T03:00:00Z'));
+      mockGetAccessSettings.mockResolvedValue(PASS_GATE_ON);
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('미활성 이용권이 있으면 403 VOD_PASS_INACTIVE 와 대상 이용권을 반환하고 SSO 쿠키는 지우지 않는다', async () => {
+      mockGetSsoUserProfile.mockResolvedValue({
+        name: '홍길동',
+        isActiveChallengeParticipant: false,
+        optionCodes: [],
+        canWatchVod: false,
+      });
+      mockGetMyVodPasses.mockResolvedValue([
+        {
+          applicationId: 20,
+          status: 'UNACTIVATED',
+          durationDays: 30,
+          startsAt: null,
+          endsAt: null,
+        },
+        {
+          applicationId: 10,
+          status: 'UNACTIVATED',
+          durationDays: 30,
+          startsAt: null,
+          endsAt: null,
+        },
+      ]);
+
+      const res = await vodListGet(makeSsoReq('http://localhost/api/vod'));
+
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({
+        code: 'VOD_PASS_INACTIVE',
+        message: '활성화되지 않은 VOD 이용권이 있습니다.',
+        pass: {
+          applicationId: 10,
+          durationDays: 30,
+          expectedEndDate: '2026-11-11',
+        },
+        inactiveCount: 2,
+      });
+      expect(res.headers.get('set-cookie') ?? '').not.toContain(
+        SSO_ACCESS_TOKEN_COOKIE,
+      );
+    });
+
+    it('이용권이 없으면 기존처럼 401 이고 SSO 쿠키는 지우지 않는다', async () => {
+      mockGetSsoUserProfile.mockResolvedValue({
+        name: '홍길동',
+        isActiveChallengeParticipant: false,
+        optionCodes: [],
+        canWatchVod: false,
+      });
+      mockGetMyVodPasses.mockResolvedValue([]);
+
+      const res = await vodListGet(makeSsoReq('http://localhost/api/vod'));
+
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual({ message: '인증이 필요합니다.' });
+      expect(res.headers.get('set-cookie') ?? '').not.toContain(
+        SSO_ACCESS_TOKEN_COOKIE,
+      );
+    });
+
+    it('토큰이 무효하면 기존처럼 401 이고 SSO 쿠키를 지운다', async () => {
+      mockGetSsoUserProfile.mockResolvedValue(null);
+
+      const res = await vodListGet(makeSsoReq('http://localhost/api/vod'));
+
+      expect(res.status).toBe(401);
+      expect(res.headers.get('set-cookie')).toContain(SSO_ACCESS_TOKEN_COOKIE);
+      expect(mockGetMyVodPasses).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe('GET /api/vod/[id]', () => {
@@ -309,6 +403,92 @@ describe('GET /api/vod/[id]', () => {
       });
 
       expect(res.status).toBe(401);
+    });
+  });
+  describe('이용권 게이트(LC-3438)', () => {
+    beforeEach(() => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-10-12T03:00:00Z'));
+      mockGetAccessSettings.mockResolvedValue(PASS_GATE_ON);
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('미활성 이용권이 있으면 403 VOD_PASS_INACTIVE 와 대상 이용권을 반환하고 SSO 쿠키는 지우지 않는다', async () => {
+      mockGetSsoUserProfile.mockResolvedValue({
+        name: '홍길동',
+        isActiveChallengeParticipant: false,
+        optionCodes: [],
+        canWatchVod: false,
+      });
+      mockGetMyVodPasses.mockResolvedValue([
+        {
+          applicationId: 20,
+          status: 'UNACTIVATED',
+          durationDays: 30,
+          startsAt: null,
+          endsAt: null,
+        },
+        {
+          applicationId: 10,
+          status: 'UNACTIVATED',
+          durationDays: 30,
+          startsAt: null,
+          endsAt: null,
+        },
+      ]);
+
+      const res = await vodDetailGet(makeSsoReq('http://localhost/api/vod/1'), {
+        params: Promise.resolve({ id: '1' }),
+      });
+
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({
+        code: 'VOD_PASS_INACTIVE',
+        message: '활성화되지 않은 VOD 이용권이 있습니다.',
+        pass: {
+          applicationId: 10,
+          durationDays: 30,
+          expectedEndDate: '2026-11-11',
+        },
+        inactiveCount: 2,
+      });
+      expect(res.headers.get('set-cookie') ?? '').not.toContain(
+        SSO_ACCESS_TOKEN_COOKIE,
+      );
+    });
+
+    it('이용권이 없으면 기존처럼 401 이고 SSO 쿠키는 지우지 않는다', async () => {
+      mockGetSsoUserProfile.mockResolvedValue({
+        name: '홍길동',
+        isActiveChallengeParticipant: false,
+        optionCodes: [],
+        canWatchVod: false,
+      });
+      mockGetMyVodPasses.mockResolvedValue([]);
+
+      const res = await vodDetailGet(makeSsoReq('http://localhost/api/vod/1'), {
+        params: Promise.resolve({ id: '1' }),
+      });
+
+      expect(res.status).toBe(401);
+      expect(await res.json()).toEqual({ message: '인증이 필요합니다.' });
+      expect(res.headers.get('set-cookie') ?? '').not.toContain(
+        SSO_ACCESS_TOKEN_COOKIE,
+      );
+    });
+
+    it('토큰이 무효하면 기존처럼 401 이고 SSO 쿠키를 지운다', async () => {
+      mockGetSsoUserProfile.mockResolvedValue(null);
+
+      const res = await vodDetailGet(makeSsoReq('http://localhost/api/vod/1'), {
+        params: Promise.resolve({ id: '1' }),
+      });
+
+      expect(res.status).toBe(401);
+      expect(res.headers.get('set-cookie')).toContain(SSO_ACCESS_TOKEN_COOKIE);
+      expect(mockGetMyVodPasses).not.toHaveBeenCalled();
     });
   });
 });

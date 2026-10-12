@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { SSO_ACCESS_TOKEN_COOKIE, getSsoUserProfile } from './sso';
 import { getAccessSettings } from './kv';
 import { isEligibleForAccess } from './accessControl';
@@ -23,6 +23,24 @@ export type VodAccessResult =
       /** 미활성 이용권 전체 개수 */
       inactiveCount: number;
     };
+
+/**
+ * 비활성 이용권 사유의 403 응답(LC-3438). 클라이언트는 `code` 로 "활성화 안내" 와
+ * 일반 접근 거부를 구분한다. `/api/vod`, `/api/vod/[id]` 본문이 어긋나지 않게 한 곳에 둔다.
+ */
+export function inactivePassResponse(
+  access: Extract<VodAccessResult, { reason: 'inactive-pass' }>,
+): NextResponse {
+  return NextResponse.json(
+    {
+      code: 'VOD_PASS_INACTIVE',
+      message: '활성화되지 않은 VOD 이용권이 있습니다.',
+      pass: access.pass,
+      inactiveCount: access.inactiveCount,
+    },
+    { status: 403 },
+  );
+}
 
 /**
  * `/api/vod`, `/api/vod/[id]` 가 공유하는 VOD 접근 판정(LC-3208).
