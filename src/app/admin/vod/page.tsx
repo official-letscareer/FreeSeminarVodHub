@@ -841,9 +841,17 @@ export default function AdminVodPage() {
       <div className="max-w-3xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">VOD 관리</h1>
-          <Button variant="outline" onClick={handleLogout}>
-            로그아웃
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => router.push('/admin/vod/usage')}
+            >
+              이용 로그
+            </Button>
+            <Button variant="outline" onClick={handleLogout}>
+              로그아웃
+            </Button>
+          </div>
         </div>
 
         {error && (

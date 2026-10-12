@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  ADMIN_SESSION_COOKIE,
+  ADMIN_SESSION_MAX_AGE_SEC,
+  createAdminSession,
+} from '@/lib/adminSession';
 
 export async function POST(request: NextRequest) {
   let body: unknown;
@@ -25,6 +30,16 @@ export async function POST(request: NextRequest) {
     sameSite: 'lax',
     path: '/',
   });
+  // 서명된 세션. 이용자 정보를 내보내는 /api/admin/usage-logs 가 admin_verified 에 더해 요구한다.
+  const session = createAdminSession();
+  if (session) {
+    response.cookies.set(ADMIN_SESSION_COOKIE, session, {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: ADMIN_SESSION_MAX_AGE_SEC,
+    });
+  }
   return response;
 }
 
@@ -35,5 +50,6 @@ export async function DELETE(request: NextRequest) {
   }
   const response = NextResponse.json({ success: true });
   response.cookies.delete('admin_verified');
+  response.cookies.delete(ADMIN_SESSION_COOKIE);
   return response;
 }
