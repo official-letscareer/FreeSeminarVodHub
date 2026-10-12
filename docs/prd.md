@@ -306,6 +306,64 @@ DELETE FROM vod_usage_logs WHERE occurred_at < NOW() - INTERVAL '180 days';
 - 렛츠커리어 로그인 사용자의 로그 배치마다 렛츠커리어 서버로 프로필 조회가 한 번 나간다. 배치는 최소 5초
   간격이다.
 
+#### 어드민 조회 (이용 로그 화면)
+
+관리자는 `/admin/vod/usage` 에서 기간(7일·30일·90일)별 집계를 본다. 기존 VOD 관리 화면(`/admin/vod`)
+헤더의 「이용 로그」 버튼으로 들어간다. 화면은 `GET /api/admin/usage-logs?view=summary|recent|users&days=&limit=`
+를 부르고, 이 라우트가 Supabase RPC 를 호출한다. 자동 갱신은 없고 「새로고침」 버튼만 있다. 시각은 KST 로
+보여준다.
+
+| view | RPC | 내용 |
+|------|-----|------|
+| `summary` | `vod_usage_summary(p_token, p_days)` | 요약 수치, 영상별(최대 50), 일별 추이, 이용권 활성화 안내 수치 |
+| `recent` | `vod_usage_recent(p_token, p_limit)` | 최근 이벤트 최신순 |
+| `users` | `vod_usage_users(p_token, p_days, p_limit)` | 사용자별 시청 요약, 시청 시간 내림차순 |
+
+- `days` 는 정수 1~180(기본 30), `limit` 은 1~200(기본 100)으로 보정한다. 잘못된 `view` 는 400 이다.
+- 인증은 다른 `/api/admin/*` 라우트와 같다. `admin_verified=1` 쿠키가 없으면 401 이다. `/admin/vod` 접두는
+  미들웨어(`src/middleware.ts`)도 같은 쿠키로 보호한다.
+- 응답 코드: 성공 200, 토큰 환경변수 없음 503, 토큰 불일치(SQLSTATE 42501) 502, 그 밖의 RPC 오류 502.
+  본문에는 고정 문구만 싣는다. 토큰이나 DB 오류 원문은 싣지 않는다. 모든 응답에 `Cache-Control: no-store` 를
+  붙인다.
+- 집계 의미는 수집 이벤트 기준이다. 재생 = `video_play`, 시청 횟수 = `video_leave`, 끝까지 본 횟수 =
+  `video_ended`, 시청 시간 = `video_leave` 의 `watched_sec` 합, 평균 이탈 진행률 = `video_leave` 의
+  `position_sec / duration_sec` 평균(영상 길이가 있는 것만), 시청자 = `COALESCE(user_key, session_id)` 의
+  distinct 이다. 탭 강제 종료처럼 `video_leave` 가 없는 시청은 시청 시간에서 빠진다.
+
+방식은 집계 전용 SQL 함수와 비밀 토큰이다. `vod_usage_logs` 는 anon 이 읽을 수 없으므로(위 RLS 설명), 함수
+3개가 `SECURITY DEFINER` 로 실행돼 집계와 최근 목록만 돌려준다. 서비스 롤 키는 전 테이블의 RLS 를 우회해
+유출 시 피해가 커서 앱에 두지 않는다. 함수 정의와 토큰 등록 안내는 `docs/supabase-usage-log-admin.sql` 이다.
+이 레포가 실행하지 않으며, 사람이 Supabase SQL Editor 에서 실행한다.
+
+환경변수 `USAGE_LOG_READ_TOKEN` 은 서버 전용이다. `NEXT_PUBLIC_` 접두어를 붙이지 않는다. 값은 로그, 응답,
+클라이언트 번들 어디에도 나가지 않는다. 비어 있으면 화면은 503 안내를 보여준다.
+
+토큰 등록 절차는 다음과 같다. 교체할 때도 같다.
+
+1. 로컬 터미널에서 토큰을 만든다. `TOKEN=$(openssl rand -hex 32)`
+2. 같은 터미널에서 해시를 구한다. `printf '%s' "$TOKEN" | shasum -a 256` 출력 앞의 64자가 해시다. 평문 토큰은
+   SQL Editor 에 붙여 넣지 않는다.
+3. 서버 환경변수 `USAGE_LOG_READ_TOKEN` 에 1번의 토큰을 설정하고 재배포한다.
+4. Supabase SQL Editor 에서 `docs/supabase-usage-log-admin.sql` 을 실행한다(여러 번 실행해도 안전하다).
+5. 같은 곳에서 해시를 등록한다. 행은 하나만 유지하므로 교체도 같은 SQL 이다.
+
+```sql
+DELETE FROM vod_usage_log_reader;
+INSERT INTO vod_usage_log_reader (token_hash) VALUES ('<2번의 해시>');
+```
+
+보안 모델과 한계는 다음과 같다.
+
+- 토큰이 틀리면 함수가 SQLSTATE 42501(`forbidden`)을 낸다. 토큰 비교 함수(`vod_usage_check_token`)는
+  anon 이 직접 호출할 수 없고, `vod_usage_log_reader` 는 RLS 를 켜고 정책을 두지 않아 anon 이 읽지도
+  쓰지도 못한다. 등록 행을 지우면 모든 조회가 막힌다.
+- 함수는 anon 에게 열려 있어, 공개 키를 아는 사람은 직접 호출해 토큰을 추측해 볼 수 있다. 호출 횟수 제한은
+  없고 방어는 토큰 길이(64자 16진수)에만 의존한다. `openssl rand -hex 32` 로 만든 토큰이 아니면 이 방어가
+  무너진다.
+- 토큰이 유출되면 누구나 집계와 최근 200건(사용자 이름 포함)을 읽을 수 있다. 의심되면 바로 교체한다. 함수는
+  원본 전체를 내보내지 않으며 `user_agent` 는 돌려주지 않는다.
+- 이 라우트와 화면은 `admin_verified` 쿠키만 본다. 관리자 비밀번호 인증의 강도가 그대로 한계다.
+
 ---
 
 ## 6. API 설계
@@ -349,6 +407,7 @@ DELETE FROM vod_usage_logs WHERE occurred_at < NOW() - INTERVAL '180 days';
 | `GET` | `/api/vod/:id` | VOD 단건 조회 | 세션 |
 | `POST` | `/api/vod/pass/activate` | VOD 이용권 활성화 (LC-3438, 5.5) | SSO 토큰 |
 | `POST` | `/api/vod/log` | VOD 이용 로그 수집 (LC-3438, 5.6) | SSO 토큰 또는 세션 |
+| `GET` | `/api/admin/usage-logs` | [관리자] 이용 로그 조회 (LC-3438, 5.6 어드민 조회) | Admin |
 | `POST` | `/api/admin/auth` | 관리자 비밀번호 인증 | 없음 |
 | `GET` | `/api/admin/vod` | [관리자] VOD 목록 조회 | Admin |
 | `POST` | `/api/admin/vod` | [관리자] VOD 추가 | Admin |
@@ -537,6 +596,10 @@ ADMIN_PASSWORD=
 # 이용 로그 사용자 키(LC-3438, 5.6). 서버 전용. NEXT_PUBLIC_ 접두어를 붙이지 않는다.
 # 비어 있으면 이용 로그는 user_key, user_name 없이 세션 단위 익명으로 남는다.
 USAGE_LOG_HASH_SECRET=
+
+# 이용 로그 어드민 조회 토큰(LC-3438, 5.6). 서버 전용. NEXT_PUBLIC_ 접두어를 붙이지 않는다.
+# 비어 있으면 /admin/vod/usage 가 503 안내를 보여준다. 등록 절차는 5.6 의 어드민 조회를 본다.
+USAGE_LOG_READ_TOKEN=
 ```
 
 ---
