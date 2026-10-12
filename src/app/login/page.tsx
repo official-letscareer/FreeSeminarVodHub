@@ -53,11 +53,19 @@ export default function LoginPage() {
    * `/vod` 로 그냥 이동해 보고 미들웨어가 판정하게 하면 안 된다 — 그 미들웨어는 쿠키가
    * **있는지만** 보는 1차 게이트라, 예전에 로그인해 남아 있는 쿠키만으로도 통과한다.
    * 만료·서명까지 실제로 검증하는 곳은 `/api/vod` 다.
+   *
+   * 이용권이 있지만 아직 활성화하지 않은 사용자(403 `VOD_PASS_INACTIVE`)도 로그인된 것으로
+   * 본다. 이 판정이 틀리면 방금 팝업으로 로그인한 비활성 보유자의 화면이 넘어가지 않아
+   * 활성화 안내 모달(`/vod`)에 닿지 못한다(LC-3438).
    */
   async function isAuthorized(): Promise<boolean> {
     try {
       const res = await fetch('/api/vod', { cache: 'no-store' });
-      return res.ok;
+      if (res.ok) return true;
+      if (res.status !== 403) return false;
+
+      const body: unknown = await res.json().catch(() => null);
+      return (body as { code?: unknown } | null)?.code === 'VOD_PASS_INACTIVE';
     } catch {
       return false;
     }
