@@ -13,6 +13,10 @@ import {
 import { PATCH as vodOrderPatch } from '@/app/api/admin/vod/order/route';
 import { NextRequest } from 'next/server';
 import {
+  ADMIN_SESSION_MAX_AGE_SEC,
+  verifyAdminSession,
+} from '@/lib/adminSession';
+import {
   getVodList,
   addVod,
   deleteVod,
@@ -117,6 +121,34 @@ describe('POST /api/admin/auth', () => {
     expect(cookie).toContain('admin_verified=1');
   });
 
+  it('올바른 비밀번호 → 서명된 admin_session 쿠키도 설정', async () => {
+    const res = await adminAuthPost(makeRequest({ password: 'test-secret' }));
+    const verified = res.cookies.get('admin_verified');
+    const session = res.cookies.get('admin_session');
+
+    expect(verified?.value).toBe('1');
+    expect(session?.value).toMatch(/^v1\.\d+\.[0-9a-f]{64}$/);
+    expect(verifyAdminSession(session?.value)).toBe(true);
+
+    const header = res.headers.get('set-cookie') ?? '';
+    const sessionCookie = header
+      .split(/,(?=\s*[^;,]+=)/)
+      .find((c) => c.trim().startsWith('admin_session='));
+    expect(sessionCookie).toMatch(/HttpOnly/i);
+    expect(sessionCookie).toMatch(/SameSite=lax/i);
+    expect(sessionCookie).toMatch(/Path=\//);
+    expect(sessionCookie).toMatch(
+      new RegExp(`Max-Age=${ADMIN_SESSION_MAX_AGE_SEC}`),
+    );
+  });
+
+  it('틀린 비밀번호 → 어떤 쿠키도 설정하지 않음', async () => {
+    const res = await adminAuthPost(makeRequest({ password: 'wrong' }));
+
+    expect(res.cookies.get('admin_verified')).toBeUndefined();
+    expect(res.cookies.get('admin_session')).toBeUndefined();
+  });
+
   it('틀린 비밀번호 → 401', async () => {
     const res = await adminAuthPost(makeRequest({ password: 'wrong' }));
     expect(res.status).toBe(401);
@@ -154,6 +186,18 @@ describe('DELETE /api/admin/auth', () => {
     req.cookies.set('admin_verified', '1');
     const res = await adminAuthDelete(req);
     expect(res.status).toBe(200);
+  });
+
+  it('로그아웃하면 admin_verified 와 admin_session 을 함께 지운다', async () => {
+    const req = new NextRequest('http://localhost/api/admin/auth', {
+      method: 'DELETE',
+    });
+    req.cookies.set('admin_verified', '1');
+    const res = await adminAuthDelete(req);
+
+    const header = res.headers.get('set-cookie') ?? '';
+    expect(header).toMatch(/admin_verified=;/);
+    expect(header).toMatch(/admin_session=;/);
   });
 
   it('미인증 상태에서 로그아웃 → 401', async () => {
