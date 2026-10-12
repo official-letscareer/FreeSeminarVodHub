@@ -14,6 +14,7 @@ import VodPassActivationDialog, {
   readInactivePass,
 } from '@/components/vod-pass-activation-dialog';
 import { VodItem } from '@/lib/types';
+import { usePageUsageLog } from '@/lib/usePageUsageLog';
 
 type ViewMode = 'grid' | 'list';
 
@@ -30,6 +31,8 @@ export default function VodListPage() {
     null,
   );
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  usePageUsageLog({ enabled: true });
 
   useEffect(() => {
     // localStorage는 서버 렌더 시점엔 없어서 lazy initializer로 옮길 수 없다 —

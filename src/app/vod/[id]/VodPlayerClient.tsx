@@ -13,6 +13,7 @@ import VodPassActivationDialog, {
   readInactivePass,
 } from '@/components/vod-pass-activation-dialog';
 import { VodItem } from '@/lib/types';
+import { usePageUsageLog } from '@/lib/usePageUsageLog';
 
 export default function VodPlayerClient({ id }: { id: string }) {
   const router = useRouter();
@@ -56,6 +57,9 @@ export default function VodPlayerClient({ id }: { id: string }) {
     if (!id) return;
     void loadVod();
   }, [id, loadVod]);
+
+  // 영상이 로드된 뒤에만 기록한다. 이용권 안내 모달만 뜬 상태는 열람으로 세지 않는다.
+  usePageUsageLog({ enabled: !!vod, vodId: vod?.id });
 
   function handleActivated() {
     setInactivePass(null);
@@ -138,7 +142,7 @@ export default function VodPlayerClient({ id }: { id: string }) {
                   )}
                 </div>
 
-                <VideoPlayer youtubeId={vod.youtubeId} />
+                <VideoPlayer youtubeId={vod.youtubeId} vodId={vod.id} />
 
                 {vod.description && (
                   <p className="text-sm whitespace-pre-line text-gray-500">
