@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import SiteHeader from '@/components/site-header';
@@ -8,6 +8,10 @@ import PageBackdrop from '@/components/page-backdrop';
 import VideoPlayer from '@/components/video-player';
 import CopyProtection from '@/components/copy-protection';
 import BannerCarousel from '@/components/banner-carousel';
+import VodPassActivationDialog, {
+  InactivePassInfo,
+  readInactivePass,
+} from '@/components/vod-pass-activation-dialog';
 import { VodItem } from '@/lib/types';
 
 export default function VodPlayerClient({ id }: { id: string }) {
@@ -16,13 +20,22 @@ export default function VodPlayerClient({ id }: { id: string }) {
   const [vod, setVod] = useState<VodItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // 비활성 이용권(LC-3438). 공유받은 링크로 바로 들어온 경우에도 같은 모달을 연다.
+  const [inactivePass, setInactivePass] = useState<InactivePassInfo | null>(
+    null,
+  );
 
-  useEffect(() => {
-    if (!id) return;
-    fetch(`/api/vod/${id}`)
-      .then((res) => {
+  const loadVod = useCallback(() => {
+    return fetch(`/api/vod/${id}`)
+      .then(async (res) => {
         if (res.status === 401) {
           router.push('/login');
+          return null;
+        }
+        // 이용권은 있지만 활성화 전이다. 로그인 문제가 아니므로 /login 으로 보내지 않는다.
+        const inactive = await readInactivePass(res);
+        if (inactive) {
+          setInactivePass(inactive);
           return null;
         }
         if (res.status === 404) {
@@ -38,6 +51,18 @@ export default function VodPlayerClient({ id }: { id: string }) {
       .catch(() => setError('VOD를 불러오지 못했습니다.'))
       .finally(() => setLoading(false));
   }, [id, router]);
+
+  useEffect(() => {
+    if (!id) return;
+    void loadVod();
+  }, [id, loadVod]);
+
+  function handleActivated() {
+    setInactivePass(null);
+    setError('');
+    setLoading(true);
+    void loadVod();
+  }
 
   return (
     <CopyProtection>
@@ -130,6 +155,15 @@ export default function VodPlayerClient({ id }: { id: string }) {
             </div>
           ) : null}
         </main>
+
+        {inactivePass && (
+          <VodPassActivationDialog
+            pass={inactivePass.pass}
+            inactiveCount={inactivePass.inactiveCount}
+            onActivated={handleActivated}
+            onLater={() => router.push('/vod')}
+          />
+        )}
       </div>
     </CopyProtection>
   );

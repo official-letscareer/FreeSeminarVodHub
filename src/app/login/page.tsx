@@ -19,6 +19,10 @@ const POPUP_NAME = 'letscareer-sso';
 // 동작하지 않는 경우가 있다. 구글도 모바일에서는 리다이렉트로 폴백한다.
 const MOBILE_MAX_WIDTH = 768;
 
+// 이름+전화번호 확인을 통과하지 못했을 때 보이는 문구. 서버 응답과 무관하게 항상 같다.
+const NOT_PASSED_MESSAGE =
+  '현재 참여 중인 챌린지가 없습니다. 이용권을 보유하셨다면 렛츠커리어 로그인으로 확인해주세요.';
+
 function formatPhoneNum(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 11);
   if (digits.length <= 3) return digits;
@@ -53,11 +57,19 @@ export default function LoginPage() {
    * `/vod` 로 그냥 이동해 보고 미들웨어가 판정하게 하면 안 된다 — 그 미들웨어는 쿠키가
    * **있는지만** 보는 1차 게이트라, 예전에 로그인해 남아 있는 쿠키만으로도 통과한다.
    * 만료·서명까지 실제로 검증하는 곳은 `/api/vod` 다.
+   *
+   * 이용권이 있지만 아직 활성화하지 않은 사용자(403 `VOD_PASS_INACTIVE`)도 로그인된 것으로
+   * 본다. 이 판정이 틀리면 방금 팝업으로 로그인한 비활성 보유자의 화면이 넘어가지 않아
+   * 활성화 안내 모달(`/vod`)에 닿지 못한다(LC-3438).
    */
   async function isAuthorized(): Promise<boolean> {
     try {
       const res = await fetch('/api/vod', { cache: 'no-store' });
-      return res.ok;
+      if (res.ok) return true;
+      if (res.status !== 403) return false;
+
+      const body: unknown = await res.json().catch(() => null);
+      return (body as { code?: unknown } | null)?.code === 'VOD_PASS_INACTIVE';
     } catch {
       return false;
     }
@@ -175,7 +187,8 @@ export default function LoginPage() {
         setSession({ name: name.trim(), phoneNum: phoneNum.trim() });
         router.push('/vod');
       } else {
-        setError('현재 참여 중인 챌린지가 없습니다.');
+        // 서버 응답과 무관한 고정 문구 — 사유별로 문구가 갈리면 가입 여부가 드러난다.
+        setError(NOT_PASSED_MESSAGE);
       }
     } catch {
       setError('서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.');

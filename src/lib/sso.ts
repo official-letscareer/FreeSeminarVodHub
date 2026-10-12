@@ -87,6 +87,11 @@ export interface SsoUserProfile {
   name: string;
   isActiveChallengeParticipant: boolean;
   optionCodes: string[];
+  /**
+   * 렛커 서버가 판정한 VOD 시청 가능 여부(LC-3438). 응답에 필드가 없으면(이용권을 모르는
+   * 구버전 서버) null — 호출한 쪽이 기존 판정으로 되돌아가야 한다.
+   */
+  canWatchVod: boolean | null;
 }
 
 /**
@@ -122,6 +127,8 @@ export async function getSsoUserProfile(
       name: data.name,
       isActiveChallengeParticipant: data.isActiveChallengeParticipant === true,
       optionCodes: Array.isArray(data.optionCodes) ? data.optionCodes : [],
+      canWatchVod:
+        typeof data.canWatchVod === 'boolean' ? data.canWatchVod : null,
     };
   } catch {
     return null;

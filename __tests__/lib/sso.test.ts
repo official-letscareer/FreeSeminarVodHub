@@ -40,6 +40,7 @@ describe('getSsoUserProfile', () => {
       name: '홍길동',
       isActiveChallengeParticipant: true,
       optionCodes: ['WFB1', 'LFB2'],
+      canWatchVod: null,
     });
     expect(global.fetch).toHaveBeenCalledWith(
       'https://api.example.com/api/v2/user/sso-profile',
@@ -65,7 +66,44 @@ describe('getSsoUserProfile', () => {
       name: '홍길동',
       isActiveChallengeParticipant: false,
       optionCodes: [],
+      canWatchVod: null,
     });
+  });
+
+  describe('canWatchVod(LC-3438)', () => {
+    function mockProfile(data: Record<string, unknown>) {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ status: 200, message: 'OK', data }),
+      });
+    }
+
+    it('true 이면 true 로 파싱한다', async () => {
+      mockProfile({ name: '홍길동', canWatchVod: true });
+      const result = await getSsoUserProfile('token');
+      expect(result?.canWatchVod).toBe(true);
+    });
+
+    it('false 이면 false 로 파싱한다', async () => {
+      mockProfile({ name: '홍길동', canWatchVod: false });
+      const result = await getSsoUserProfile('token');
+      expect(result?.canWatchVod).toBe(false);
+    });
+
+    it('필드가 없으면 null(구버전 서버)로 파싱한다', async () => {
+      mockProfile({ name: '홍길동' });
+      const result = await getSsoUserProfile('token');
+      expect(result?.canWatchVod).toBeNull();
+    });
+
+    it.each([['true'], [1], [0], [null], [{}]])(
+      '불리언이 아닌 값(%p)은 null 로 파싱한다',
+      async (value) => {
+        mockProfile({ name: '홍길동', canWatchVod: value });
+        const result = await getSsoUserProfile('token');
+        expect(result?.canWatchVod).toBeNull();
+      },
+    );
   });
 
   it('401(만료·위조 토큰) 응답이면 null 반환', async () => {

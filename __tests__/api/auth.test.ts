@@ -19,6 +19,7 @@ const OFF_SETTINGS: AccessSettings = {
   requireChallengeParticipation: false,
   requireChallengeOption: false,
   allowedOptionCodes: [],
+  requireVodPass: false,
 };
 
 const originalFetch = global.fetch;
@@ -295,6 +296,7 @@ describe('POST /api/auth/verify', () => {
         requireChallengeParticipation: true,
         requireChallengeOption: false,
         allowedOptionCodes: [],
+        requireVodPass: false,
       });
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
@@ -314,6 +316,7 @@ describe('POST /api/auth/verify', () => {
         requireChallengeParticipation: false,
         requireChallengeOption: true,
         allowedOptionCodes: ['WFB1', 'LFB2'],
+        requireVodPass: false,
       });
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
@@ -335,6 +338,7 @@ describe('POST /api/auth/verify', () => {
         requireChallengeParticipation: false,
         requireChallengeOption: true,
         allowedOptionCodes: ['WFB1', 'LFB2'],
+        requireVodPass: false,
       });
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
@@ -372,6 +376,7 @@ describe('POST /api/auth/verify', () => {
         requireChallengeParticipation: true,
         requireChallengeOption: true,
         allowedOptionCodes: ['WFB1'],
+        requireVodPass: false,
       });
 
       const res = await POST(
@@ -380,6 +385,286 @@ describe('POST /api/auth/verify', () => {
       const body = await res.json();
       expect(body.isChallenge).toBe(true);
       expect(mockGetAccessSettings).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── 이용권 게이트(LC-3438) ───────────────────────────────────────
+  describe('이용권 게이트(LC-3438)', () => {
+    const ONE_DAY = 'Max-Age=86400';
+    const ONE_YEAR = 'Max-Age=31536000';
+
+    function gateSettings(overrides: Partial<AccessSettings> = {}) {
+      mockGetAccessSettings.mockResolvedValue({
+        ...OFF_SETTINGS,
+        requireVodPass: true,
+        ...overrides,
+      });
+    }
+
+    function mockVerifyChallenge(data: Record<string, unknown>) {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ data }),
+      });
+    }
+
+    async function verify() {
+      const res = await POST(
+        makeRequest({ name: '홍길동', phoneNum: '01012345678' }),
+      );
+      return { body: await res.json(), cookie: res.headers.get('set-cookie') };
+    }
+
+    it('ON + canWatchVod true → 통과하고 쿠키 수명은 24시간이다', async () => {
+      gateSettings();
+      mockVerifyChallenge({ isChallenge: true, canWatchVod: true });
+
+      const { body, cookie } = await verify();
+
+      expect(body).toEqual({ isChallenge: true });
+      expect(cookie).toContain('auth_verified=1');
+      expect(cookie).toContain(ONE_DAY);
+    });
+
+    it('ON + canWatchVod true → 챌린지 옵션 필터는 보지 않는다', async () => {
+      gateSettings({
+        requireChallengeOption: true,
+        allowedOptionCodes: ['WFB1'],
+      });
+      mockVerifyChallenge({
+        isChallenge: true,
+        canWatchVod: true,
+        optionCodes: [],
+      });
+
+      const { body } = await verify();
+
+      expect(body.isChallenge).toBe(true);
+    });
+
+    it('ON + canWatchVod false → 통과하지 못하고 쿠키를 내리지 않는다', async () => {
+      gateSettings();
+      mockVerifyChallenge({ isChallenge: true, canWatchVod: false });
+
+      const { body, cookie } = await verify();
+
+      expect(body).toEqual({ isChallenge: false });
+      expect(cookie).toBeNull();
+    });
+
+    it('ON + 챌린지가 아니고 canWatchVod false → 통과하지 못한다', async () => {
+      gateSettings();
+      mockVerifyChallenge({ isChallenge: false, canWatchVod: false });
+
+      const { body, cookie } = await verify();
+
+      expect(body).toEqual({ isChallenge: false });
+      expect(cookie).toBeNull();
+    });
+
+    it('ON + 챌린지가 아니고 canWatchVod true → 통과시키지 않는다', async () => {
+      gateSettings();
+      mockVerifyChallenge({ isChallenge: false, canWatchVod: true });
+
+      const { body, cookie } = await verify();
+
+      expect(body).toEqual({ isChallenge: false });
+      expect(cookie).toBeNull();
+    });
+
+    it('ON + canWatchVod 필드 없음(null) → 기존 필터로 되돌아간다', async () => {
+      gateSettings({
+        requireChallengeOption: true,
+        allowedOptionCodes: ['WFB1'],
+      });
+      mockVerifyChallenge({ isChallenge: true, optionCodes: ['PLUS1'] });
+
+      const { body, cookie } = await verify();
+
+      expect(body).toEqual({ isChallenge: false });
+      expect(cookie).toBeNull();
+    });
+
+    it('ON + canWatchVod 필드 없음(null) + 기존 필터 통과 → 통과하되 쿠키는 24시간이다', async () => {
+      gateSettings({
+        requireChallengeOption: true,
+        allowedOptionCodes: ['WFB1'],
+      });
+      mockVerifyChallenge({ isChallenge: true, optionCodes: ['WFB1'] });
+
+      const { body, cookie } = await verify();
+
+      expect(body.isChallenge).toBe(true);
+      expect(cookie).toContain(ONE_DAY);
+    });
+
+    it('OFF + canWatchVod true/false → 기존 판정 그대로 통과하고 쿠키는 1년이다', async () => {
+      for (const canWatchVod of [true, false]) {
+        mockGetAccessSettings.mockResolvedValue(OFF_SETTINGS);
+        mockVerifyChallenge({ isChallenge: true, canWatchVod });
+
+        const { body, cookie } = await verify();
+
+        expect(body).toEqual({ isChallenge: true });
+        expect(cookie).toContain(ONE_YEAR);
+      }
+    });
+
+    it('OFF + canWatchVod null → 기존 판정 그대로 통과하고 쿠키는 1년이다', async () => {
+      mockGetAccessSettings.mockResolvedValue(OFF_SETTINGS);
+      mockVerifyChallenge({ isChallenge: true });
+
+      const { body, cookie } = await verify();
+
+      expect(body.isChallenge).toBe(true);
+      expect(cookie).toContain(ONE_YEAR);
+    });
+
+    it('예외 유저는 게이트가 켜져 있어도 쿠키가 1년이다 — 설정을 읽지 않는다', async () => {
+      mockIsAllowedUser.mockResolvedValue(true);
+      gateSettings();
+
+      const { body, cookie } = await verify();
+
+      expect(body.isChallenge).toBe(true);
+      expect(cookie).toContain(ONE_YEAR);
+      expect(mockGetAccessSettings).not.toHaveBeenCalled();
+    });
+
+    it('최상위 형태 응답({ isChallenge, canWatchVod })도 읽는다', async () => {
+      gateSettings();
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ isChallenge: true, canWatchVod: false }),
+      });
+
+      const { body } = await verify();
+
+      expect(body).toEqual({ isChallenge: false });
+    });
+  });
+
+  // ─── 계정 존재 여부 비노출 ─────────────────────────────────────────
+  // 이 경로는 비인증이다. 통과하지 못한 사유(가입 안 됨 / 가입했지만 이용권 없음 / 게이트
+  // 상태)가 응답에서 갈리면 이름+전화번호 조합으로 가입 여부를 알아낼 수 있다.
+  describe('통과 실패 응답은 사유와 무관하게 동일하다', () => {
+    const FAILED_CASES: Array<{
+      label: string;
+      settings: AccessSettings;
+      mockBackend: () => void;
+    }> = [
+      {
+        label: 'BE 404 (가입되지 않은 사용자)',
+        settings: OFF_SETTINGS,
+        mockBackend: () => {
+          (global.fetch as jest.Mock).mockResolvedValue({
+            ok: false,
+            status: 404,
+            text: async () => '',
+          });
+        },
+      },
+      {
+        label: 'BE 200 + isChallenge false',
+        settings: OFF_SETTINGS,
+        mockBackend: () => {
+          (global.fetch as jest.Mock).mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({ data: { isChallenge: false } }),
+          });
+        },
+      },
+      {
+        label: '게이트 ON + isChallenge false + canWatchVod false',
+        settings: { ...OFF_SETTINGS, requireVodPass: true },
+        mockBackend: () => {
+          (global.fetch as jest.Mock).mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              data: { isChallenge: false, canWatchVod: false },
+            }),
+          });
+        },
+      },
+      {
+        label: '게이트 ON + isChallenge true + canWatchVod false',
+        settings: { ...OFF_SETTINGS, requireVodPass: true },
+        mockBackend: () => {
+          (global.fetch as jest.Mock).mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              data: { isChallenge: true, canWatchVod: false },
+            }),
+          });
+        },
+      },
+    ];
+
+    async function run(settings: AccessSettings, mockBackend: () => void) {
+      jest.clearAllMocks();
+      mockIsAllowedUser.mockResolvedValue(false);
+      mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 4 });
+      mockGetAccessSettings.mockResolvedValue(settings);
+      mockBackend();
+      const res = await POST(
+        makeRequest({ name: '홍길동', phoneNum: '01012345678' }),
+      );
+      return {
+        status: res.status,
+        body: await res.json(),
+        cookie: res.headers.get('set-cookie'),
+      };
+    }
+
+    it.each(FAILED_CASES)(
+      '$label → 200 + { isChallenge: false } 이고 쿠키가 없다',
+      async ({ settings, mockBackend }) => {
+        const { status, body, cookie } = await run(settings, mockBackend);
+
+        expect(status).toBe(200);
+        expect(body).toEqual({ isChallenge: false });
+        expect(Object.keys(body)).not.toContain('message');
+        expect(cookie).toBeNull();
+      },
+    );
+
+    it('사유가 달라도 상태 코드·본문이 서로 같다', async () => {
+      const results = [];
+      for (const { settings, mockBackend } of FAILED_CASES) {
+        const { status, body } = await run(settings, mockBackend);
+        results.push(JSON.stringify({ status, body }));
+      }
+
+      expect(new Set(results).size).toBe(1);
+    });
+
+    it('챌린지가 아니면 이용권 설정을 읽지 않는다 — 사유별로 처리 경로가 갈리지 않는다', async () => {
+      for (const { settings, mockBackend } of FAILED_CASES.slice(0, 3)) {
+        await run(settings, mockBackend);
+        expect(mockGetAccessSettings).not.toHaveBeenCalled();
+      }
+    });
+
+    it('통과 응답에도 message 키가 없다', async () => {
+      const { body } = await run(
+        { ...OFF_SETTINGS, requireVodPass: true },
+        () => {
+          (global.fetch as jest.Mock).mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              data: { isChallenge: true, canWatchVod: true },
+            }),
+          });
+        },
+      );
+
+      expect(body).toEqual({ isChallenge: true });
     });
   });
 });

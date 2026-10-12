@@ -51,8 +51,14 @@ CREATE TABLE access_settings (
   require_challenge_participation BOOLEAN NOT NULL DEFAULT false,
   require_challenge_option BOOLEAN NOT NULL DEFAULT false,
   allowed_option_codes TEXT[] NOT NULL DEFAULT '{}',
+  require_vod_pass BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- 이미 운영 중인 DB 에 VOD 이용권 게이트 스위치를 추가할 때 (LC-3438)
+-- 이 레포가 실행하지 않는다. 사람이 Supabase SQL Editor 에서 직접 실행한다.
+-- 어드민 화면에서 "이용권 보유자만 접근 허용" 토글을 저장하기 전에 먼저 실행해야 한다.
+-- ALTER TABLE access_settings ADD COLUMN require_vod_pass BOOLEAN NOT NULL DEFAULT false;
 
 -- RLS 비활성화 (API Routes에서 인증 처리)
 ALTER TABLE vods DISABLE ROW LEVEL SECURITY;

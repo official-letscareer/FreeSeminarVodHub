@@ -49,6 +49,7 @@ const mockSettings = {
   requireChallengeParticipation: false,
   requireChallengeOption: true,
   allowedOptionCodes: ['WFB1', 'LFB2'],
+  requireVodPass: false,
 };
 
 // ─── GET /api/admin/access-settings ───────────────────────────────────
@@ -70,6 +71,7 @@ describe('GET /api/admin/access-settings', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual(mockSettings);
+    expect(body.requireVodPass).toBe(false);
   });
 });
 
@@ -117,6 +119,37 @@ describe('PATCH /api/admin/access-settings', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.allowedOptionCodes).toEqual(['PLUS1']);
+  });
+
+  it('requireVodPass 변경(LC-3438) — 저장하고 응답에 포함한다', async () => {
+    mockUpdateAccessSettings.mockResolvedValue({
+      ...mockSettings,
+      requireVodPass: true,
+    });
+    const res = await PATCH(
+      makeAdminReq('PATCH', 'http://localhost/api/admin/access-settings', {
+        requireVodPass: true,
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(mockUpdateAccessSettings).toHaveBeenCalledWith({
+      requireChallengeParticipation: undefined,
+      requireChallengeOption: undefined,
+      allowedOptionCodes: undefined,
+      requireVodPass: true,
+    });
+    const body = await res.json();
+    expect(body.requireVodPass).toBe(true);
+  });
+
+  it('requireVodPass가 boolean이 아니면 400이고 저장하지 않는다', async () => {
+    const res = await PATCH(
+      makeAdminReq('PATCH', 'http://localhost/api/admin/access-settings', {
+        requireVodPass: 'yes',
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect(mockUpdateAccessSettings).not.toHaveBeenCalled();
   });
 
   it('requireChallengeParticipation이 boolean이 아니면 400', async () => {

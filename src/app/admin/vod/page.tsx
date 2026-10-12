@@ -158,6 +158,7 @@ export default function AdminVodPage() {
     requireChallengeParticipation: false,
     requireChallengeOption: false,
     allowedOptionCodes: [],
+    requireVodPass: false,
   });
   const [accessSettingsLoading, setAccessSettingsLoading] = useState(true);
   const [accessSettingsSaving, setAccessSettingsSaving] = useState(false);
@@ -802,6 +803,10 @@ export default function AdminVodPage() {
     saveAccessSettings({ requireChallengeOption: checked });
   }
 
+  function handleToggleRequireVodPass(checked: boolean) {
+    saveAccessSettings({ requireVodPass: checked });
+  }
+
   function handleAddOptionCode(e: React.FormEvent) {
     e.preventDefault();
     const code = newOptionCode.trim();
@@ -1434,6 +1439,32 @@ export default function AdminVodPage() {
                       ))}
                     </ul>
                   )}
+                </div>
+
+                <div className="flex items-center justify-between gap-4 border-t border-gray-200 pt-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      이용권 보유자만 접근 허용
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      켜면 렛츠커리어 로그인 사용자는 VOD 이용권(시청 가능
+                      여부)이 있어야 통과한다. 이 토글이 켜져 있는 동안 위의
+                      챌린지 참여 필수·옵션 필수 필터는 SSO 로그인 판정에서
+                      쓰이지 않는다.
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      렛츠커리어 서버(BE) 배포와 컷오버 이후에 켜야 한다. 컷오버
+                      전에 켜면 이용권이 없는 기존 챌린지 참여자는 통과하지
+                      못한다. 운영 DB 에 require_vod_pass 컬럼을 먼저 추가해야
+                      저장된다.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={accessSettings.requireVodPass}
+                    disabled={accessSettingsSaving}
+                    onCheckedChange={handleToggleRequireVodPass}
+                    aria-label="이용권 보유자만 접근 허용 여부"
+                  />
                 </div>
               </>
             )}

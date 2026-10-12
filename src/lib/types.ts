@@ -49,4 +49,9 @@ export interface AccessSettings {
   requireChallengeParticipation: boolean;
   requireChallengeOption: boolean;
   allowedOptionCodes: string[];
+  /**
+   * VOD 이용권 게이트(LC-3438). 켜면 SSO 로그인 판정에서 위 두 필터 대신 렛커 서버가
+   * 내려주는 `canWatchVod` 를 쓴다. 기본 OFF 라 배포만으로는 동작이 바뀌지 않는다.
+   */
+  requireVodPass: boolean;
 }

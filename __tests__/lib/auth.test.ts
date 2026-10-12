@@ -45,6 +45,15 @@ describe('auth utils', () => {
       expect(result).toBe(false);
     });
 
+    it('응답에 message 가 섞여 있어도 boolean 만 돌려준다 — 서버 문구는 화면에 닿지 않는다', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ isChallenge: false, message: '서버가 준 문구' }),
+      });
+      const result = await verifyChallenge('홍길동', '01099999999');
+      expect(result).toBe(false);
+    });
+
     it('서버 응답 실패(ok: false) 시 false 반환', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({ ok: false });
       const result = await verifyChallenge('홍길동', '01012345678');
