@@ -1,20 +1,12 @@
 /** @jest-environment jsdom */
-import { createHash } from 'node:crypto';
-import { TextEncoder as NodeTextEncoder } from 'node:util';
 
 type UsageLogModule = typeof import('@/lib/usageLog');
 
 const ENDPOINT = '/api/vod/log';
 const PHONE = '01012345678';
 
-const digest = jest.fn(async (_algorithm: string, data: Uint8Array) => {
-  const hash = createHash('sha256').update(Buffer.from(data)).digest();
-  return hash.buffer.slice(hash.byteOffset, hash.byteOffset + hash.byteLength);
-});
-
-function sha256(text: string) {
-  return createHash('sha256').update(text).digest('hex');
-}
+// 해시 계산을 하지 않는다는 것을 확인하려고 둔 감시용 목이다.
+const digest = jest.fn();
 
 function setCrypto(value: unknown) {
   Object.defineProperty(globalThis, 'crypto', {
@@ -69,7 +61,6 @@ describe('usageLog 큐', () => {
     loaded = [];
     sessionStorage.clear();
     localStorage.clear();
-    global.TextEncoder ??= NodeTextEncoder as typeof TextEncoder;
     setCrypto({ randomUUID: () => 'uuid-1234', subtle: { digest } });
     fetchMock = jest.fn().mockResolvedValue({ ok: true, status: 204 });
     beaconMock = jest.fn().mockReturnValue(true);
@@ -291,8 +282,8 @@ describe('usageLog 큐', () => {
     });
   });
 
-  describe('식별', () => {
-    it('이름+전화번호 세션이면 이름과 SHA-256 해시를 싣고 전화번호 원문은 싣지 않는다', async () => {
+  describe('식별 정보를 보내지 않는다', () => {
+    it('로그인 세션이 있어도 본문은 sessionId 와 events 뿐이고 이름·전화번호·키가 없다', async () => {
       login();
       const { logUsage, flushUsageLog } = load();
 
@@ -300,72 +291,39 @@ describe('usageLog 큐', () => {
       await flushUsageLog();
 
       const [, init] = fetchMock.mock.calls[0];
-      const body = fetchBody();
-      expect(body.userName).toBe('홍길동');
-      expect(body.userKey).toBe(sha256(`홍길동:${PHONE}`));
+      expect(Object.keys(fetchBody()).sort()).toEqual(['events', 'sessionId']);
+      expect(init.body).not.toContain('홍길동');
       expect(init.body).not.toContain(PHONE);
-      expect(JSON.stringify(init)).not.toContain(PHONE);
+      expect(init.body).not.toContain('userName');
+      expect(init.body).not.toContain('userKey');
+      expect(digest).not.toHaveBeenCalled();
     });
 
-    it('pagehide beacon 에도 전화번호 원문이 없다', async () => {
+    it('pagehide beacon 본문에도 이름·전화번호·키가 없다', async () => {
       login();
-      const { logUsage, flushUsageLog } = load();
-      logUsage({ type: 'page_view' });
-      await flushUsageLog();
+      const { logUsage } = load();
 
       logUsage({ type: 'page_leave' });
       window.dispatchEvent(new Event('pagehide'));
 
       const text = await readBlob(beaconMock.mock.calls[0][1] as Blob);
+      expect(Object.keys(JSON.parse(text)).sort()).toEqual([
+        'events',
+        'sessionId',
+      ]);
+      expect(text).not.toContain('홍길동');
       expect(text).not.toContain(PHONE);
-      expect(JSON.parse(text).userKey).toBe(sha256(`홍길동:${PHONE}`));
     });
 
-    it('해시는 한 번만 계산하고 beacon 은 캐시된 값을 쓴다', async () => {
-      login();
-      const { logUsage, flushUsageLog } = load();
-
-      logUsage({ type: 'page_view' });
-      await flushUsageLog();
-      logUsage({ type: 'video_play' });
-      await flushUsageLog();
-      logUsage({ type: 'page_leave' });
-      await flushUsageLog({ beacon: true });
-
-      expect(digest).toHaveBeenCalledTimes(1);
-      const text = await readBlob(beaconMock.mock.calls[0][1] as Blob);
-      expect(JSON.parse(text).userName).toBe('홍길동');
-    });
-
-    it('로그인 세션이 없으면(SSO 사용자) 이름과 키를 비워 보낸다', async () => {
+    it('로그인 세션 저장소를 읽지 않는다', async () => {
+      const getItem = jest.spyOn(Storage.prototype, 'getItem');
       const { logUsage, flushUsageLog } = load();
 
       logUsage({ type: 'page_view' });
       await flushUsageLog();
 
-      expect(fetchBody()).toMatchObject({ userName: null, userKey: null });
-      expect(digest).not.toHaveBeenCalled();
-    });
-
-    it('crypto.subtle 이 없으면 userKey 는 null, 이름은 그대로', async () => {
-      login();
-      setCrypto({ randomUUID: () => 'uuid-1234' });
-      const { logUsage, flushUsageLog } = load();
-
-      logUsage({ type: 'page_view' });
-      await flushUsageLog();
-
-      expect(fetchBody()).toMatchObject({ userName: '홍길동', userKey: null });
-    });
-
-    it('손상된 세션 값은 비로그인으로 본다', async () => {
-      localStorage.setItem('auth_session', '{not json');
-      const { logUsage, flushUsageLog } = load();
-
-      logUsage({ type: 'page_view' });
-      await flushUsageLog();
-
-      expect(fetchBody()).toMatchObject({ userName: null, userKey: null });
+      expect(getItem).not.toHaveBeenCalledWith('auth_session');
+      getItem.mockRestore();
     });
   });
 });
