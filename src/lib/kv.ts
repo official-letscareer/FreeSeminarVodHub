@@ -7,6 +7,21 @@ import {
   AccessSettings,
 } from './types';
 import type { UsageDetail, UsageEventType } from './usageLogEvents';
+import {
+  UsageLogForbiddenError,
+  UsageLogNotConfiguredError,
+  UsageLogQueryError,
+  clampUsageDays,
+  clampUsageLimit,
+  parseUsageRecent,
+  parseUsageSummary,
+  parseUsageUsers,
+} from './usageLogAdmin';
+import type {
+  UsageRecentEvent,
+  UsageSummary,
+  UsageUser,
+} from './usageLogAdmin';
 
 function getSupabase() {
   if (!supabase) throw new Error('Supabase가 설정되지 않았습니다.');
@@ -585,4 +600,53 @@ export async function insertUsageLogs(rows: UsageLogRow[]): Promise<void> {
       })),
     );
   if (error) throw error;
+}
+
+// ─── 이용 로그 조회 (LC-3438, 어드민) ─────────────────────────────────────────
+// 읽기는 RLS 때문에 공개 키로 막혀 있다. docs/supabase-usage-log-admin.sql 의 SECURITY DEFINER 함수를
+// 서버 전용 토큰(USAGE_LOG_READ_TOKEN)과 함께 호출한다. 토큰은 이 함수 밖으로 나가지 않는다.
+async function callUsageLogRpc(
+  fn: 'vod_usage_summary' | 'vod_usage_recent' | 'vod_usage_users',
+  args: { p_days?: number; p_limit?: number },
+): Promise<unknown> {
+  const token = process.env.USAGE_LOG_READ_TOKEN?.trim();
+  if (!token) throw new UsageLogNotConfiguredError();
+
+  const { data, error } = await getSupabase().rpc(fn, {
+    p_token: token,
+    ...args,
+  });
+  if (error) {
+    // 42501 은 함수가 토큰을 거절한 것이다. 원문은 버리고 코드만 남긴다.
+    if (error.code === '42501') throw new UsageLogForbiddenError();
+    throw new UsageLogQueryError(error.code ?? null);
+  }
+  return data;
+}
+
+export async function getUsageSummary(days: number): Promise<UsageSummary> {
+  const data = await callUsageLogRpc('vod_usage_summary', {
+    p_days: clampUsageDays(days),
+  });
+  return parseUsageSummary(data);
+}
+
+export async function getUsageRecent(
+  limit: number,
+): Promise<UsageRecentEvent[]> {
+  const data = await callUsageLogRpc('vod_usage_recent', {
+    p_limit: clampUsageLimit(limit),
+  });
+  return parseUsageRecent(data);
+}
+
+export async function getUsageUsers(
+  days: number,
+  limit: number,
+): Promise<UsageUser[]> {
+  const data = await callUsageLogRpc('vod_usage_users', {
+    p_days: clampUsageDays(days),
+    p_limit: clampUsageLimit(limit),
+  });
+  return parseUsageUsers(data);
 }
