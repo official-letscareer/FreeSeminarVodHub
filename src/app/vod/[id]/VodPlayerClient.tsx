@@ -8,10 +8,6 @@ import PageBackdrop from '@/components/page-backdrop';
 import VideoPlayer from '@/components/video-player';
 import CopyProtection from '@/components/copy-protection';
 import BannerCarousel from '@/components/banner-carousel';
-import VodPassActivationDialog, {
-  InactivePassInfo,
-  readInactivePass,
-} from '@/components/vod-pass-activation-dialog';
 import { VodItem } from '@/lib/types';
 import { usePageUsageLog } from '@/lib/usePageUsageLog';
 
@@ -21,22 +17,12 @@ export default function VodPlayerClient({ id }: { id: string }) {
   const [vod, setVod] = useState<VodItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  // 비활성 이용권(LC-3438). 공유받은 링크로 바로 들어온 경우에도 같은 모달을 연다.
-  const [inactivePass, setInactivePass] = useState<InactivePassInfo | null>(
-    null,
-  );
 
   const loadVod = useCallback(() => {
     return fetch(`/api/vod/${id}`)
-      .then(async (res) => {
+      .then((res) => {
         if (res.status === 401) {
           router.push('/login');
-          return null;
-        }
-        // 이용권은 있지만 활성화 전이다. 로그인 문제가 아니므로 /login 으로 보내지 않는다.
-        const inactive = await readInactivePass(res);
-        if (inactive) {
-          setInactivePass(inactive);
           return null;
         }
         if (res.status === 404) {
@@ -58,15 +44,8 @@ export default function VodPlayerClient({ id }: { id: string }) {
     void loadVod();
   }, [id, loadVod]);
 
-  // 영상이 로드된 뒤에만 기록한다. 이용권 안내 모달만 뜬 상태는 열람으로 세지 않는다.
+  // 영상이 로드된 뒤에만 기록한다.
   usePageUsageLog({ enabled: !!vod, vodId: vod?.id });
-
-  function handleActivated() {
-    setInactivePass(null);
-    setError('');
-    setLoading(true);
-    void loadVod();
-  }
 
   return (
     <CopyProtection>
@@ -159,15 +138,6 @@ export default function VodPlayerClient({ id }: { id: string }) {
             </div>
           ) : null}
         </main>
-
-        {inactivePass && (
-          <VodPassActivationDialog
-            pass={inactivePass.pass}
-            inactiveCount={inactivePass.inactiveCount}
-            onActivated={handleActivated}
-            onLater={() => router.push('/vod')}
-          />
-        )}
       </div>
     </CopyProtection>
   );

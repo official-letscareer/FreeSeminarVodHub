@@ -1,15 +1,10 @@
 jest.mock('@/lib/kv');
 jest.mock('@/lib/sso');
-jest.mock('@/lib/vodPass', () => ({
-  ...jest.requireActual('@/lib/vodPass'),
-  getMyVodPasses: jest.fn(),
-}));
 
 import { NextRequest } from 'next/server';
 import { checkVodAccess } from '@/lib/vodAccess';
 import { getAccessSettings } from '@/lib/kv';
 import { getSsoUserProfile, SSO_ACCESS_TOKEN_COOKIE } from '@/lib/sso';
-import { getMyVodPasses, VodPass } from '@/lib/vodPass';
 import { AccessSettings } from '@/lib/types';
 
 const mockGetAccessSettings = getAccessSettings as jest.MockedFunction<
@@ -17,9 +12,6 @@ const mockGetAccessSettings = getAccessSettings as jest.MockedFunction<
 >;
 const mockGetSsoUserProfile = getSsoUserProfile as jest.MockedFunction<
   typeof getSsoUserProfile
->;
-const mockGetMyVodPasses = getMyVodPasses as jest.MockedFunction<
-  typeof getMyVodPasses
 >;
 
 const GATE_OFF: AccessSettings = {
@@ -45,17 +37,6 @@ function profile(canWatchVod: boolean | null, participating = false) {
   };
 }
 
-function pass(overrides: Partial<VodPass>): VodPass {
-  return {
-    applicationId: 1,
-    status: 'UNACTIVATED',
-    durationDays: 30,
-    startsAt: null,
-    endsAt: null,
-    ...overrides,
-  };
-}
-
 describe('checkVodAccess', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -67,14 +48,13 @@ describe('checkVodAccess', () => {
     jest.useRealTimers();
   });
 
-  describe('판정표 5가지(LC-3438)', () => {
+  describe('판정표(LC-3438)', () => {
     it('requireVodPass OFF — canWatchVod 가 false 여도 기존 판정(필터 꺼짐)으로 통과한다', async () => {
       mockGetSsoUserProfile.mockResolvedValue(profile(false));
 
       const result = await checkVodAccess(makeSsoReq());
 
       expect(result).toEqual({ authorized: true });
-      expect(mockGetMyVodPasses).not.toHaveBeenCalled();
     });
 
     it('requireVodPass OFF — 기존 챌린지 참여 필터가 그대로 적용된다', async () => {
@@ -87,7 +67,6 @@ describe('checkVodAccess', () => {
       const result = await checkVodAccess(makeSsoReq());
 
       expect(result).toEqual({ authorized: false, reason: 'ineligible' });
-      expect(mockGetMyVodPasses).not.toHaveBeenCalled();
     });
 
     it('ON + canWatchVod true — 통과한다', async () => {
@@ -111,58 +90,9 @@ describe('checkVodAccess', () => {
       expect(result).toEqual({ authorized: true });
     });
 
-    it('ON + canWatchVod false + 미활성 이용권 있음 — inactive-pass 와 대상 이용권을 돌려준다', async () => {
+    it('ON + canWatchVod false — 이용권도 레거시 권한도 없으면 ineligible 이다 (활성화 단계는 없다)', async () => {
       mockGetSsoUserProfile.mockResolvedValue(profile(false));
       mockGetAccessSettings.mockResolvedValue(GATE_ON);
-      mockGetMyVodPasses.mockResolvedValue([
-        pass({ applicationId: 20 }),
-        pass({ applicationId: 10, durationDays: 30 }),
-        pass({ applicationId: 5, status: 'EXPIRED' }),
-      ]);
-
-      const result = await checkVodAccess(makeSsoReq());
-
-      expect(result).toEqual({
-        authorized: false,
-        reason: 'inactive-pass',
-        pass: {
-          applicationId: 10,
-          durationDays: 30,
-          // 2026-10-12 12:00 KST + 30일
-          expectedEndDate: '2026-11-11',
-        },
-        inactiveCount: 2,
-      });
-      expect(mockGetMyVodPasses).toHaveBeenCalledWith('access.jwt.value');
-    });
-
-    it('ON + canWatchVod false + 미활성 이용권 없음 — ineligible', async () => {
-      mockGetSsoUserProfile.mockResolvedValue(profile(false));
-      mockGetAccessSettings.mockResolvedValue(GATE_ON);
-      mockGetMyVodPasses.mockResolvedValue([
-        pass({ applicationId: 1, status: 'EXPIRED' }),
-        pass({ applicationId: 2, status: 'CANCELED' }),
-      ]);
-
-      const result = await checkVodAccess(makeSsoReq());
-
-      expect(result).toEqual({ authorized: false, reason: 'ineligible' });
-    });
-
-    it('ON + canWatchVod false + 이용권이 하나도 없음 — ineligible', async () => {
-      mockGetSsoUserProfile.mockResolvedValue(profile(false));
-      mockGetAccessSettings.mockResolvedValue(GATE_ON);
-      mockGetMyVodPasses.mockResolvedValue([]);
-
-      const result = await checkVodAccess(makeSsoReq());
-
-      expect(result).toEqual({ authorized: false, reason: 'ineligible' });
-    });
-
-    it('ON + canWatchVod false + 이용권 조회 실패(null) — ineligible', async () => {
-      mockGetSsoUserProfile.mockResolvedValue(profile(false));
-      mockGetAccessSettings.mockResolvedValue(GATE_ON);
-      mockGetMyVodPasses.mockResolvedValue(null);
 
       const result = await checkVodAccess(makeSsoReq());
 
@@ -176,7 +106,6 @@ describe('checkVodAccess', () => {
       const result = await checkVodAccess(makeSsoReq());
 
       expect(result).toEqual({ authorized: true });
-      expect(mockGetMyVodPasses).not.toHaveBeenCalled();
     });
 
     it('ON + canWatchVod null — 기존 필터가 켜져 있으면 그 판정을 따른다', async () => {
@@ -193,7 +122,7 @@ describe('checkVodAccess', () => {
   });
 
   describe('우회 경로와 요청 수', () => {
-    it('auth_verified 쿠키는 설정·프로필·이용권을 하나도 조회하지 않고 통과한다', async () => {
+    it('auth_verified 쿠키는 설정·프로필을 하나도 조회하지 않고 통과한다', async () => {
       const req = new NextRequest('http://localhost/api/vod');
       req.cookies.set('auth_verified', '1');
       mockGetAccessSettings.mockResolvedValue(GATE_ON);
@@ -203,7 +132,6 @@ describe('checkVodAccess', () => {
       expect(result).toEqual({ authorized: true });
       expect(mockGetSsoUserProfile).not.toHaveBeenCalled();
       expect(mockGetAccessSettings).not.toHaveBeenCalled();
-      expect(mockGetMyVodPasses).not.toHaveBeenCalled();
     });
 
     it('SSO 쿠키가 없으면 no-auth', async () => {
@@ -214,23 +142,13 @@ describe('checkVodAccess', () => {
       expect(result).toEqual({ authorized: false, reason: 'no-auth' });
     });
 
-    it('토큰이 무효하면 invalid-token 이고 설정·이용권을 조회하지 않는다', async () => {
+    it('토큰이 무효하면 invalid-token 이고 설정을 조회하지 않는다', async () => {
       mockGetSsoUserProfile.mockResolvedValue(null);
 
       const result = await checkVodAccess(makeSsoReq());
 
       expect(result).toEqual({ authorized: false, reason: 'invalid-token' });
       expect(mockGetAccessSettings).not.toHaveBeenCalled();
-      expect(mockGetMyVodPasses).not.toHaveBeenCalled();
-    });
-
-    it('통과 경로(canWatchVod true)에서는 getMyVodPasses 를 호출하지 않는다', async () => {
-      mockGetSsoUserProfile.mockResolvedValue(profile(true));
-      mockGetAccessSettings.mockResolvedValue(GATE_ON);
-
-      await checkVodAccess(makeSsoReq());
-
-      expect(mockGetMyVodPasses).not.toHaveBeenCalled();
     });
   });
 });

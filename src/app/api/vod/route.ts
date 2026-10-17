@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getEnabledVodList } from '@/lib/kv';
 import { SSO_ACCESS_TOKEN_COOKIE } from '@/lib/sso';
-import { checkVodAccess, inactivePassResponse } from '@/lib/vodAccess';
+import { checkVodAccess } from '@/lib/vodAccess';
 
 function unauthorized(clearSsoCookie: boolean): NextResponse {
   const response = NextResponse.json(
@@ -26,9 +26,6 @@ function unauthorized(clearSsoCookie: boolean): NextResponse {
 export async function GET(request: NextRequest) {
   const access = await checkVodAccess(request);
   if (!access.authorized) {
-    if (access.reason === 'inactive-pass') {
-      return inactivePassResponse(access);
-    }
     return unauthorized(access.reason === 'invalid-token');
   }
 

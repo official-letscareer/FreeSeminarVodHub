@@ -126,57 +126,45 @@
 
 ### 5.5 VOD 이용권 판정 (LC-3438)
 
-렛츠커리어 서버가 VOD 이용권을 도입하면서 시청 가능 여부를 `canWatchVod` 로 내려준다. 설정
-`require_vod_pass`(어드민 화면의 "이용권 보유자만 접근 허용" 토글)가 켜져 있을 때만 이 값으로
-접근을 판정한다. 기본값은 OFF 이므로 켜기 전에는 기존 판정(챌린지 참여자·옵션 필터)이 그대로 동작한다.
+렛츠커리어 서버가 VOD 이용권을 도입하면서 시청 가능 여부를 `canWatchVod` 로 내려준다. 접근 기준은
+어드민 화면의 "접근 기준 설정" 에서 둘 중 하나를 고른다. 두 기준은 함께 적용되지 않는다.
+
+| 기준 | 설정 | 판정 |
+|------|------|------|
+| 챌린지 참여자 | `require_vod_pass` OFF (기본값) | 활성 챌린지 참여자 여부, 허용 옵션 코드(각각 켜고 끌 수 있음) |
+| VOD 이용권 보유자 | `require_vod_pass` ON | `canWatchVod` 만 본다. 챌린지 참여·옵션 필터는 쓰지 않는다 |
+
+`canWatchVod` 는 렛츠커리어 서버가 계산한다. 지금 이용 중(`ACTIVE`)인 구매 이용권이 있거나, 컷오버
+(`VOD_PASS_LEGACY_CUTOVER_AT`) 이전에 신청한 챌린지의 레거시 시청 권한(챌린지 종료 후 3일까지)이 남아 있으면
+`true` 다. 이용권은 구매 즉시 시작되므로 사용자가 직접 활성화하는 단계는 없다.
 
 SSO 로그인 사용자의 판정은 다음과 같다(`src/lib/vodAccess.ts`).
 
-| require_vod_pass | canWatchVod | 미활성 이용권 | 결과 |
-|------------------|-------------|---------------|------|
-| OFF | 무관 | 무관 | 기존 판정 |
-| ON | true | 무관 | 통과 |
-| ON | false | 있음 | 403 `VOD_PASS_INACTIVE`, 활성화 안내 모달 |
-| ON | false | 없음 | 401, 로그인 화면 |
-| ON | 필드 없음 | 무관 | 기존 판정으로 되돌아감(이용권을 모르는 구버전 서버) |
+| require_vod_pass | canWatchVod | 결과 |
+|------------------|-------------|------|
+| OFF | 무관 | 기존 판정(챌린지 참여자·옵션 필터) |
+| ON | true | 통과 |
+| ON | false | 401, 로그인 화면 |
+| ON | 필드 없음 | 기존 판정으로 되돌아감(이용권을 모르는 구버전 서버) |
 
-- 이용권 목록 조회가 실패하면 "미활성 이용권 없음" 과 같이 401 로 처리한다.
 - 예외 유저(`allowed_users`)와 프리미엄 유저(`/api/auth/verify-membership`) 우회는 이 설정과 무관하게 유지된다.
 - 설정은 `access_settings.require_vod_pass` 컬럼에 저장된다(`docs/supabase-schema.sql`). 이미 운영 중인
   Supabase 에는 같은 파일의 `ALTER TABLE` 문을 사람이 직접 실행해야 저장된다.
-
-활성화 흐름은 다음과 같다.
-
-1. `/vod`, `/vod/[id]` 가 `/api/vod` 계열에서 403 `VOD_PASS_INACTIVE` 를 받는다. 본문에는 활성화 대상
-   이용권(`pass.applicationId`, `durationDays`, `expectedEndDate`)과 미활성 이용권 개수(`inactiveCount`)가 있다.
-2. `/login` 으로 보내지 않고 활성화 안내 모달(`src/components/vod-pass-activation-dialog.tsx`)을 연다.
-   카카오톡·슬랙으로 공유받은 `/vod/[id]` 직접 진입도 같다.
-3. "사용하기" 는 `POST /api/vod/pass/activate`(본문 `{ applicationId }`)를 호출하고, 이 라우트가 렛츠커리어
-   서버의 `POST /api/v1/vod-pass/{applicationId}/activate` 로 전달한다. 성공하면 목록 또는 같은 VOD 를 다시
-   조회한다.
-4. 409(기간 충돌, 환불 확인 중, 취소됨)이면 렛츠커리어 서버가 준 메시지를 모달 안에 보여주고 닫지 않는다.
-5. "나중에" 는 목록 화면에서 "이용권을 활성화하면 시청할 수 있습니다" 빈 상태와 다시 열기 버튼을 보여주고,
-   재생 화면에서는 `/vod` 로 돌아간다.
-
-- 활성화 대상은 미활성 이용권 중 가장 먼저 구매한 것(`applicationId` 가 가장 작은 것)이다. 선택 화면은 없다.
-- 활성화하면 이용 기간이 바로 시작되고 환불할 수 없다. 모달이 이를 고지한다.
-- 예상 종료일은 지금(KST) + `durationDays` 로 계산한 값이다. 실제 종료 시각은 활성화 순간 렛츠커리어 서버가 정한다.
-- SSO 팝업으로 방금 로그인한 비활성 이용권 보유자도 로그인된 것으로 본다(`src/app/login/page.tsx` 의
-  `isAuthorized()` 가 403 `VOD_PASS_INACTIVE` 를 통과로 판정).
+- 예전에 있던 "이용권 활성화 안내 모달" 과 `POST /api/vod/pass/activate` 는 렛츠커리어 서버가 활성화 API 를
+  없애면서 함께 제거했다. 이용권이 없는 사용자는 401 로 로그인 화면으로 간다.
 - 미들웨어(`src/middleware.ts`)는 쿠키 존재만 보므로 바꾸지 않았고, 링크 미리보기(`generateMetadata`)도 그대로다.
 
 이름 + 전화번호 경로(`src/app/api/auth/verify/route.ts`)의 한계는 다음과 같다.
 
-- JWT 가 없어 이용권을 조회하거나 활성화할 수 없다. `verify-challenge` 응답의 `canWatchVod` 만 받는다.
+- JWT 가 없어 이용권을 직접 조회할 수 없다. `verify-challenge` 응답의 `canWatchVod` 만 받는다.
 - 설정이 ON 이고 `canWatchVod` 가 내려오면 기존 필터 대신 그 값으로 판정한다. `false` 이면 응답
-  `message` 로 "렛츠커리어 로그인으로 이용권을 확인해주세요." 를 안내한다. 미활성 이용권을 가졌는지는 알 수
-  없으므로 이용권이 없다고 단정하지 않는다.
+  `message` 로 "렛츠커리어 로그인으로 이용권을 확인해주세요." 를 안내한다.
 - `canWatchVod` 가 `true` 여도 `verify-challenge` 가 챌린지 참여(`isChallenge`)를 `false` 로 내려주면 이
   경로로는 통과하지 못한다. 이 경우 렛츠커리어 로그인을 써야 한다.
 - `auth_verified` 쿠키는 이용권 종료를 반영하지 못한다. 설정이 ON 이면 쿠키 수명을 24시간으로 줄이고,
   OFF 이거나 예외 유저이면 기존대로 1년이다.
 
-새 환경변수는 없다. 이용권 조회·활성화 호출도 기존 `LETSCAREER_API_URL` 을 쓴다.
+새 환경변수는 없다. 렛츠커리어 서버 호출은 기존 `LETSCAREER_API_URL` 을 쓴다.
 
 ### 5.6 이용 로그 (LC-3438)
 
@@ -245,9 +233,9 @@ SSO 로그인 사용자의 판정은 다음과 같다(`src/lib/vodAccess.ts`).
 | `video_fullscreen` | 전체화면을 켜거나 껐을 때 | `on` |
 | `video_progress` | 재생 중 30초마다 | 없음 |
 | `video_leave` | 영상 화면을 떠날 때. 마지막 위치와 누적 시청 시간 | 없음 |
-| `pass_prompt_shown` | 이용권 활성화 안내 모달이 열렸을 때 | 없음 |
-| `pass_activated` | 이용권 활성화에 성공했을 때 | 없음 |
-| `pass_activate_failed` | 이용권 활성화에 실패했을 때 | `status`(HTTP 상태 코드, 응답을 받지 못했으면 0) |
+| `pass_prompt_shown` | (더 이상 기록하지 않는다. 활성화 안내 모달 제거. 과거 데이터 호환용 정의) | 없음 |
+| `pass_activated` | (더 이상 기록하지 않는다. 과거 데이터 호환용 정의) | 없음 |
+| `pass_activate_failed` | (더 이상 기록하지 않는다. 과거 데이터 호환용 정의) | `status` |
 
 수집 흐름은 다음과 같다.
 
@@ -427,7 +415,6 @@ INSERT INTO vod_usage_log_reader (token_hash) VALUES ('<2번의 해시>');
 | `POST` | `/api/auth/verify` | 렛츠커리어 검증 API 프록시 | 없음 |
 | `GET` | `/api/vod` | VOD 목록 조회 | 세션 |
 | `GET` | `/api/vod/:id` | VOD 단건 조회 | 세션 |
-| `POST` | `/api/vod/pass/activate` | VOD 이용권 활성화 (LC-3438, 5.5) | SSO 토큰 |
 | `POST` | `/api/vod/log` | VOD 이용 로그 수집 (LC-3438, 5.6) | SSO 토큰 또는 세션 |
 | `GET` | `/api/admin/usage-logs` | [관리자] 이용 로그 조회 (LC-3438, 5.6 어드민 조회) | Admin |
 | `POST` | `/api/admin/auth` | 관리자 비밀번호 인증 | 없음 |

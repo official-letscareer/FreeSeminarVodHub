@@ -1,46 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { SSO_ACCESS_TOKEN_COOKIE, getSsoUserProfile } from './sso';
 import { getAccessSettings } from './kv';
 import { isEligibleForAccess } from './accessControl';
-import {
-  expectedEndDate,
-  getMyVodPasses,
-  pickActivatablePass,
-} from './vodPass';
 
 export type VodAccessResult =
   | { authorized: true }
-  | { authorized: false; reason: 'no-auth' | 'invalid-token' | 'ineligible' }
-  | {
-      authorized: false;
-      reason: 'inactive-pass';
-      /** 활성화 대상: 미활성 이용권 중 가장 먼저 구매한 것 */
-      pass: {
-        applicationId: number;
-        durationDays: number;
-        expectedEndDate: string;
-      };
-      /** 미활성 이용권 전체 개수 */
-      inactiveCount: number;
-    };
-
-/**
- * 비활성 이용권 사유의 403 응답(LC-3438). 클라이언트는 `code` 로 "활성화 안내" 와
- * 일반 접근 거부를 구분한다. `/api/vod`, `/api/vod/[id]` 본문이 어긋나지 않게 한 곳에 둔다.
- */
-export function inactivePassResponse(
-  access: Extract<VodAccessResult, { reason: 'inactive-pass' }>,
-): NextResponse {
-  return NextResponse.json(
-    {
-      code: 'VOD_PASS_INACTIVE',
-      message: '활성화되지 않은 VOD 이용권이 있습니다.',
-      pass: access.pass,
-      inactiveCount: access.inactiveCount,
-    },
-    { status: 403 },
-  );
-}
+  | { authorized: false; reason: 'no-auth' | 'invalid-token' | 'ineligible' };
 
 /**
  * `/api/vod`, `/api/vod/[id]` 가 공유하는 VOD 접근 판정(LC-3208).
@@ -68,31 +33,14 @@ export async function checkVodAccess(
 
   const settings = await getAccessSettings();
 
-  // 이용권 게이트(LC-3438). canWatchVod 가 null 이면 이용권을 모르는 구버전 서버라
-  // 기존 판정으로 되돌아간다. 이때는 이용권 목록도 조회하지 않는다.
+  // 이용권 게이트(LC-3438). 렛커 서버가 내려준 canWatchVod(현재 유효한 이용권, 또는 컷오버 전에
+  // 신청한 챌린지의 레거시 시청 권한)만으로 정한다. 이 스위치가 켜져 있는 동안 챌린지 참여·옵션
+  // 필터는 쓰지 않는다. canWatchVod 가 null 이면 이용권을 모르는 구버전 서버라 기존 판정으로
+  // 되돌아간다.
   if (settings.requireVodPass && profile.canWatchVod !== null) {
-    if (profile.canWatchVod) {
-      return { authorized: true };
-    }
-
-    // 통과 경로에서는 요청이 늘지 않도록, 막힌 경우에만 이용권 목록을 조회한다.
-    const passes = await getMyVodPasses(ssoToken);
-    const target = passes ? pickActivatablePass(passes) : null;
-    if (!passes || !target) {
-      return { authorized: false, reason: 'ineligible' };
-    }
-
-    return {
-      authorized: false,
-      reason: 'inactive-pass',
-      pass: {
-        applicationId: target.applicationId,
-        durationDays: target.durationDays,
-        expectedEndDate: expectedEndDate(target.durationDays, new Date()),
-      },
-      inactiveCount: passes.filter((pass) => pass.status === 'UNACTIVATED')
-        .length,
-    };
+    return profile.canWatchVod
+      ? { authorized: true }
+      : { authorized: false, reason: 'ineligible' };
   }
 
   const eligible = isEligibleForAccess(

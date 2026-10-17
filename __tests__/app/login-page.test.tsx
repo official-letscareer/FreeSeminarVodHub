@@ -1,6 +1,12 @@
 /** @jest-environment jsdom */
 import '@testing-library/jest-dom';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 
 const pushMock = jest.fn();
 const replaceMock = jest.fn();
@@ -65,7 +71,9 @@ describe('LoginPage — SSO 버튼 (LC-3208)', () => {
     setViewportWidth(1280);
     openPopupMock.mockReturnValue(fakePopup());
     // 기본값: 로그인되지 않은 상태(/api/vod 가 401)
-    global.fetch = jest.fn().mockResolvedValue({ ok: false }) as unknown as typeof fetch;
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue({ ok: false }) as unknown as typeof fetch;
   });
 
   afterAll(() => {
@@ -151,7 +159,9 @@ describe('LoginPage — SSO 버튼 (LC-3208)', () => {
     fireEvent.click(
       screen.getByRole('button', { name: '렛츠커리어로 로그인하기' }),
     );
-    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/vod', expect.anything()));
+    await waitFor(() =>
+      expect(global.fetch).toHaveBeenCalledWith('/api/vod', expect.anything()),
+    );
 
     // 로그인하지 않은 채 사용자가 창을 닫는다.
     // 감시 인터벌은 500ms 다. 실제로 두 주기를 흘려보낸 뒤 확인한다.
@@ -166,7 +176,9 @@ describe('LoginPage — SSO 버튼 (LC-3208)', () => {
   it('이미 로그인돼 있던 상태에서 팝업만 닫아도 /vod 로 보내지 않는다', async () => {
     // 예전 로그인 쿠키가 남아 있어 열기 전부터 인가된 상태다. 이 팝업이 한 일이 없으므로
     // 이동하면 "취소했는데 로그인됨"으로 보인다.
-    global.fetch = jest.fn().mockResolvedValue({ ok: true }) as unknown as typeof fetch;
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue({ ok: true }) as unknown as typeof fetch;
     const popup = fakePopup();
     openPopupMock.mockReturnValue(popup);
     render(<LoginPage />);
@@ -185,38 +197,7 @@ describe('LoginPage — SSO 버튼 (LC-3208)', () => {
     expect(replaceMock).not.toHaveBeenCalled();
   });
 
-  it('팝업으로 로그인한 비활성 이용권 보유자(403 VOD_PASS_INACTIVE)도 닫힌 뒤 /vod 로 보낸다', async () => {
-    // 열기 전에는 로그인되지 않은 401, 팝업이 로그인을 끝낸 뒤에는 이용권 미활성 403 이다.
-    let loggedIn = false;
-    global.fetch = jest.fn().mockImplementation(async () => {
-      if (!loggedIn) return { ok: false, status: 401, json: async () => ({}) };
-      return {
-        ok: false,
-        status: 403,
-        json: async () => ({ code: 'VOD_PASS_INACTIVE', inactiveCount: 1 }),
-      };
-    }) as unknown as typeof fetch;
-    const popup = fakePopup();
-    openPopupMock.mockReturnValue(popup);
-    render(<LoginPage />);
-
-    fireEvent.click(
-      screen.getByRole('button', { name: '렛츠커리어로 로그인하기' }),
-    );
-    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
-    // 열기 전 판정이 끝난 뒤에 로그인된 것으로 바꾼다.
-    await act(async () => {
-      await Promise.resolve();
-    });
-    loggedIn = true;
-
-    (popup as unknown as { closed: boolean }).closed = true;
-    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/vod'), {
-      timeout: 2000,
-    });
-  });
-
-  it('다른 사유의 403 은 로그인된 것으로 보지 않아 팝업을 닫아도 이동하지 않는다', async () => {
+  it('403 은 로그인된 것으로 보지 않아 팝업을 닫아도 이동하지 않는다 (활성화 단계가 없다)', async () => {
     let loggedIn = false;
     global.fetch = jest.fn().mockImplementation(async () => {
       if (!loggedIn) return { ok: false, status: 401, json: async () => ({}) };
@@ -241,34 +222,6 @@ describe('LoginPage — SSO 버튼 (LC-3208)', () => {
     });
 
     expect(global.fetch).toHaveBeenCalledTimes(2);
-    expect(replaceMock).not.toHaveBeenCalled();
-  });
-
-  it('이미 비활성 이용권 상태로 로그인돼 있던 경우 팝업만 닫아도 /vod 로 보내지 않는다', async () => {
-    // 열기 전부터 403 VOD_PASS_INACTIVE 라 "원래부터 로그인돼 있던 것"이다.
-    // 비활성 보유자도 이 구분(wasAuthorizedRef)이 그대로 지켜져야 한다.
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: false,
-      status: 403,
-      json: async () => ({ code: 'VOD_PASS_INACTIVE' }),
-    }) as unknown as typeof fetch;
-    const popup = fakePopup();
-    openPopupMock.mockReturnValue(popup);
-    render(<LoginPage />);
-
-    fireEvent.click(
-      screen.getByRole('button', { name: '렛츠커리어로 로그인하기' }),
-    );
-    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    (popup as unknown as { closed: boolean }).closed = true;
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 1200));
-    });
-
     expect(replaceMock).not.toHaveBeenCalled();
   });
 
