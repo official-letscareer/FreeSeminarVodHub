@@ -123,10 +123,30 @@ describe('POST /api/vod/log', () => {
     expect(mockInsert).not.toHaveBeenCalled();
   });
 
-  it('SSO 토큰이 있어도 프로필이 null 이면 401 이고, verified 쿠키로 되돌아가지 않는다', async () => {
+  it('SSO 토큰이 만료돼 프로필이 null 이어도 auth_verified 가 있으면 verified 로 기록한다', async () => {
     mockProfile.mockResolvedValue(null);
 
-    const res = await POST(makeReq(BODY, { sso: 'jwt', verified: true }));
+    const res = await POST(
+      makeReq(BODY, {
+        sso: 'expired-jwt',
+        verified: true,
+        cookies: logCookies(signedCookie()),
+      }),
+    );
+
+    expect(res.status).toBe(204);
+    const [rows] = mockInsert.mock.calls[0];
+    expect(rows[0]).toMatchObject({
+      authMethod: 'verified',
+      userName: '홍길동',
+      userKey: UID,
+    });
+  });
+
+  it('SSO 토큰만 있고 프로필이 null 이면(verified 없음) 401 이고 저장하지 않는다', async () => {
+    mockProfile.mockResolvedValue(null);
+
+    const res = await POST(makeReq(BODY, { sso: 'jwt' }));
 
     expect(res.status).toBe(401);
     expect(mockInsert).not.toHaveBeenCalled();

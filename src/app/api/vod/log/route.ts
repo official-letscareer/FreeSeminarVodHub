@@ -40,17 +40,21 @@ export async function POST(request: NextRequest) {
     let userName: string | null;
     let userKey: string | null;
 
-    if (ssoToken) {
-      // SSO 이름은 서버가 확인한 프로필 이름만 쓴다.
-      const profile = await getSsoUserProfile(ssoToken);
-      if (!profile) return unauthorized();
+    // SSO 이름은 서버가 확인한 프로필 이름만 쓴다. 토큰이 만료·무효라 프로필을 못 받았어도
+    // 이 브라우저가 이름+전화번호 등으로 로그인(auth_verified)돼 있으면 그 경로로 기록한다.
+    // VOD 접근 판정(`checkVodAccess`)이 auth_verified 를 먼저 통과시키므로, 낡은 SSO 쿠키가
+    // 남은 사람의 로그만 401 로 버려지면 시청은 되는데 기록만 비는 어긋남이 생긴다.
+    const profile = ssoToken ? await getSsoUserProfile(ssoToken) : null;
+    if (profile) {
       authMethod = 'sso';
       userName = profile.name;
       userKey = usageLogKey(`sso:${profile.name}`);
-    } else {
+    } else if (verified) {
       // 로그인 성공 시 서버가 심은 쿠키만 읽는다. 요청 본문의 이름·키는 읽지 않는다.
       authMethod = 'verified';
       ({ userName, userKey } = readUsageLogIdentity(request.cookies));
+    } else {
+      return unauthorized();
     }
 
     const userAgent =
