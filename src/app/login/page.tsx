@@ -58,18 +58,13 @@ export default function LoginPage() {
    * **있는지만** 보는 1차 게이트라, 예전에 로그인해 남아 있는 쿠키만으로도 통과한다.
    * 만료·서명까지 실제로 검증하는 곳은 `/api/vod` 다.
    *
-   * 이용권이 있지만 아직 활성화하지 않은 사용자(403 `VOD_PASS_INACTIVE`)도 로그인된 것으로
-   * 본다. 이 판정이 틀리면 방금 팝업으로 로그인한 비활성 보유자의 화면이 넘어가지 않아
-   * 활성화 안내 모달(`/vod`)에 닿지 못한다(LC-3438).
+   * 이용권 게이트(LC-3438)에서 통과하지 못한 사용자는 `/api/vod` 가 401 을 주므로 로그인된
+   * 것으로 보지 않는다. 이용권은 구매 즉시 시작돼 활성화 단계가 없다.
    */
   async function isAuthorized(): Promise<boolean> {
     try {
       const res = await fetch('/api/vod', { cache: 'no-store' });
-      if (res.ok) return true;
-      if (res.status !== 403) return false;
-
-      const body: unknown = await res.json().catch(() => null);
-      return (body as { code?: unknown } | null)?.code === 'VOD_PASS_INACTIVE';
+      return res.ok;
     } catch {
       return false;
     }
