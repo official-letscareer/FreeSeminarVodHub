@@ -58,6 +58,7 @@ describe('이용 로그 화면 연결 (LC-3438)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     window.history.pushState({}, '', '/');
+    window.sessionStorage.clear();
   });
 
   describe('VOD 목록', () => {
@@ -103,6 +104,7 @@ describe('이용 로그 화면 연결 (LC-3438)', () => {
         type: 'page_view',
         vodId: 7,
         pagePath: '/vod/7',
+        detail: { from: '' },
       });
     });
   });

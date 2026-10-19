@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUsageRecent, getUsageSummary, getUsageUsers } from '@/lib/kv';
+import {
+  getUsageRecent,
+  getUsageSummary,
+  getUsageUserEvents,
+  getUsageUsers,
+} from '@/lib/kv';
+import { usageLogKey } from '@/lib/usageLogIdentity';
 import {
   ADMIN_SESSION_COOKIE,
   isAdminSessionConfigured,
@@ -7,6 +13,9 @@ import {
 } from '@/lib/adminSession';
 import {
   ADMIN_SESSION_NOT_CONFIGURED_MESSAGE,
+  USER_SEARCH_EMPTY_QUERY_MESSAGE,
+  USER_SEARCH_NEEDS_KEY_SECRET_MESSAGE,
+  USER_SEARCH_NEEDS_NAME_MESSAGE,
   UsageLogForbiddenError,
   UsageLogNotConfiguredError,
   UsageLogQueryError,
@@ -50,14 +59,50 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = request.nextUrl;
   const view = searchParams.get('view');
-  if (view !== 'summary' && view !== 'recent' && view !== 'users') {
+  if (
+    view !== 'summary' &&
+    view !== 'recent' &&
+    view !== 'users' &&
+    view !== 'user'
+  ) {
     return respond({ message: 'view 값이 올바르지 않습니다.' }, 400);
   }
 
   const days = clampUsageDays(searchParams.get('days'));
   const limit = clampUsageLimit(searchParams.get('limit'));
 
+  // 유저 검색. 전화번호는 저장돼 있지 않아 이름과 합쳐 서버가 키를 만들어 정확히 찾는다.
+  let userQuery: { name: string | null; userKey: string | null } | null = null;
+  if (view === 'user') {
+    const name = (searchParams.get('name') ?? '').trim().slice(0, 100);
+    const phone = (searchParams.get('phone') ?? '').replace(/\D/g, '');
+    if (!name && !phone) {
+      return respond({ message: USER_SEARCH_EMPTY_QUERY_MESSAGE }, 400);
+    }
+    if (!name) {
+      return respond({ message: USER_SEARCH_NEEDS_NAME_MESSAGE }, 400);
+    }
+    if (phone) {
+      const userKey = usageLogKey(`phone:${name}:${phone}`);
+      if (!userKey) {
+        return respond({ message: USER_SEARCH_NEEDS_KEY_SECRET_MESSAGE }, 400);
+      }
+      userQuery = { name, userKey };
+    } else {
+      userQuery = { name, userKey: null };
+    }
+  }
+
   try {
+    if (view === 'user' && userQuery) {
+      return respond(
+        await getUsageUserEvents({
+          name: userQuery.name,
+          userKey: userQuery.userKey,
+          days,
+        }),
+      );
+    }
     if (view === 'summary') {
       return respond(await getUsageSummary(days));
     }

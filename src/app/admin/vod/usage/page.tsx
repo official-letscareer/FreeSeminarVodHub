@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
+import UserUsageSearch from '@/components/admin/UserUsageSearch';
 import {
   ADMIN_SESSION_NOT_CONFIGURED_MESSAGE,
   usageEventLabel,
@@ -232,223 +233,209 @@ export default function AdminVodUsagePage() {
   }, [days, load]);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">이용 로그</h1>
-          <Button variant="outline" onClick={() => router.push('/admin/vod')}>
-            VOD 관리로 돌아가기
+    <div className="space-y-6">
+      <UserUsageSearch days={days} />
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex gap-2" role="group" aria-label="조회 기간">
+          {PERIODS.map((period) => (
+            <Button
+              key={period}
+              variant={days === period ? 'default' : 'outline'}
+              aria-pressed={days === period}
+              onClick={() => setDays(period)}
+            >
+              {period}일
+            </Button>
+          ))}
+        </div>
+        <div className="flex items-center gap-3">
+          {data && (
+            <span className="text-xs text-gray-500">
+              조회 시각 {formatKst(data.summary.generatedAt)} (KST)
+            </span>
+          )}
+          <Button
+            variant="outline"
+            onClick={() => void load(days)}
+            disabled={loading}
+          >
+            {loading ? '불러오는 중...' : '새로고침'}
           </Button>
         </div>
+      </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex gap-2" role="group" aria-label="조회 기간">
-            {PERIODS.map((period) => (
-              <Button
-                key={period}
-                variant={days === period ? 'default' : 'outline'}
-                aria-pressed={days === period}
-                onClick={() => setDays(period)}
-              >
-                {period}일
-              </Button>
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {loading && (
+        <div className="space-y-4" aria-busy="true">
+          <p className="text-sm text-gray-500">이용 로그를 불러오는 중...</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-20" />
             ))}
           </div>
-          <div className="flex items-center gap-3">
-            {data && (
-              <span className="text-xs text-gray-500">
-                조회 시각 {formatKst(data.summary.generatedAt)} (KST)
-              </span>
-            )}
-            <Button
-              variant="outline"
-              onClick={() => void load(days)}
-              disabled={loading}
-            >
-              {loading ? '불러오는 중...' : '새로고침'}
-            </Button>
-          </div>
+          <Skeleton className="h-48" />
         </div>
+      )}
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {loading && (
-          <div className="space-y-4" aria-busy="true">
-            <p className="text-sm text-gray-500">이용 로그를 불러오는 중...</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {[0, 1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-20" />
-              ))}
-            </div>
-            <Skeleton className="h-48" />
+      {!loading && data && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatCard label="방문 세션" value={data.summary.totals.sessions} />
+            <StatCard label="시청자" value={data.summary.totals.viewers} />
+            <StatCard label="재생" value={data.summary.totals.plays} />
+            <StatCard
+              label="시청 시간(분)"
+              value={data.summary.totals.watchedMin}
+            />
           </div>
-        )}
 
-        {!loading && data && (
-          <>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <StatCard
-                label="방문 세션"
-                value={data.summary.totals.sessions}
-              />
-              <StatCard label="시청자" value={data.summary.totals.viewers} />
-              <StatCard label="재생" value={data.summary.totals.plays} />
-              <StatCard
-                label="시청 시간(분)"
-                value={data.summary.totals.watchedMin}
-              />
-            </div>
-
-            <Section title="영상별" empty={data.summary.vods.length === 0}>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200 bg-gray-50">
-                    <th className={TH}>제목</th>
-                    <th className={TH}>재생</th>
-                    <th className={TH}>시청자</th>
-                    <th className={TH}>시청 횟수</th>
-                    <th className={TH}>끝까지 본 횟수</th>
-                    <th className={TH}>평균 시청 시간</th>
-                    <th className={TH}>평균 이탈 진행률</th>
+          <Section title="영상별" empty={data.summary.vods.length === 0}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  <th className={TH}>제목</th>
+                  <th className={TH}>재생</th>
+                  <th className={TH}>시청자</th>
+                  <th className={TH}>시청 횟수</th>
+                  <th className={TH}>끝까지 본 횟수</th>
+                  <th className={TH}>평균 시청 시간</th>
+                  <th className={TH}>평균 이탈 진행률</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.summary.vods.map((vod) => (
+                  <tr key={vod.vodId} className={ROW}>
+                    <td className="p-2 min-w-48">
+                      {vodTitle(vod.title, vod.vodId)}
+                    </td>
+                    <td className={TD}>{formatCount(vod.plays)}</td>
+                    <td className={TD}>{formatCount(vod.viewers)}</td>
+                    <td className={TD}>{formatCount(vod.views)}</td>
+                    <td className={TD}>{formatCount(vod.ended)}</td>
+                    <td className={TD}>{formatDuration(vod.avgWatchedSec)}</td>
+                    <td className={TD}>{formatPercent(vod.avgExitPct)}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {data.summary.vods.map((vod) => (
-                    <tr key={vod.vodId} className={ROW}>
-                      <td className="p-2 min-w-48">
-                        {vodTitle(vod.title, vod.vodId)}
-                      </td>
-                      <td className={TD}>{formatCount(vod.plays)}</td>
-                      <td className={TD}>{formatCount(vod.viewers)}</td>
-                      <td className={TD}>{formatCount(vod.views)}</td>
-                      <td className={TD}>{formatCount(vod.ended)}</td>
-                      <td className={TD}>
-                        {formatDuration(vod.avgWatchedSec)}
-                      </td>
-                      <td className={TD}>{formatPercent(vod.avgExitPct)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </Section>
+                ))}
+              </tbody>
+            </table>
+          </Section>
 
-            <Section title="일별 추이" empty={data.summary.daily.length === 0}>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200 bg-gray-50">
-                    <th className={TH}>날짜</th>
-                    <th className={TH}>방문 세션</th>
-                    <th className={TH}>재생</th>
-                    <th className={TH}>시청 시간(분)</th>
+          <Section title="일별 추이" empty={data.summary.daily.length === 0}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  <th className={TH}>날짜</th>
+                  <th className={TH}>방문 세션</th>
+                  <th className={TH}>재생</th>
+                  <th className={TH}>시청 시간(분)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.summary.daily.map((day) => (
+                  <tr key={day.date} className={ROW}>
+                    <td className={TD}>{day.date}</td>
+                    <td className={TD}>{formatCount(day.sessions)}</td>
+                    <td className={TD}>{formatCount(day.plays)}</td>
+                    <td className={TD}>{formatCount(day.watchedMin)}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {data.summary.daily.map((day) => (
-                    <tr key={day.date} className={ROW}>
-                      <td className={TD}>{day.date}</td>
-                      <td className={TD}>{formatCount(day.sessions)}</td>
-                      <td className={TD}>{formatCount(day.plays)}</td>
-                      <td className={TD}>{formatCount(day.watchedMin)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </Section>
+                ))}
+              </tbody>
+            </table>
+          </Section>
 
-            <Section title="사용자별" empty={data.users.length === 0}>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200 bg-gray-50">
-                    <th className={TH}>이름</th>
-                    <th className={TH}>본 영상 수</th>
-                    <th className={TH}>총 시청 분</th>
-                    <th className={TH}>마지막 이용</th>
+          <Section title="사용자별" empty={data.users.length === 0}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  <th className={TH}>이름</th>
+                  <th className={TH}>본 영상 수</th>
+                  <th className={TH}>총 시청 분</th>
+                  <th className={TH}>마지막 이용</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.users.map((user, index) => (
+                  <tr
+                    key={`${user.userKey ?? user.userName ?? 'anonymous'}-${index}`}
+                    className={ROW}
+                  >
+                    <td className={TD}>{user.userName ?? '(익명)'}</td>
+                    <td className={TD}>{formatCount(user.vods)}</td>
+                    <td className={TD}>{formatCount(user.watchedMin)}</td>
+                    <td className={TD}>{formatKst(user.lastSeen)}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {data.users.map((user, index) => (
-                    <tr
-                      key={`${user.userKey ?? user.userName ?? 'anonymous'}-${index}`}
-                      className={ROW}
-                    >
-                      <td className={TD}>{user.userName ?? '(익명)'}</td>
-                      <td className={TD}>{formatCount(user.vods)}</td>
-                      <td className={TD}>{formatCount(user.watchedMin)}</td>
-                      <td className={TD}>{formatKst(user.lastSeen)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </Section>
+                ))}
+              </tbody>
+            </table>
+          </Section>
 
-            <Section
-              title="최근 이벤트"
-              empty={data.events.length === 0}
-              emptyMessage={EMPTY_RECENT_MESSAGE}
-            >
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200 bg-gray-50">
-                    <th className={TH}>시각(KST)</th>
-                    <th className={TH}>이벤트</th>
-                    <th className={TH}>영상</th>
-                    <th className={TH}>위치</th>
-                    <th className={TH}>사용자</th>
-                    <th className={TH}>세션</th>
+          <Section
+            title="최근 이벤트"
+            empty={data.events.length === 0}
+            emptyMessage={EMPTY_RECENT_MESSAGE}
+          >
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  <th className={TH}>시각(KST)</th>
+                  <th className={TH}>이벤트</th>
+                  <th className={TH}>영상</th>
+                  <th className={TH}>위치</th>
+                  <th className={TH}>사용자</th>
+                  <th className={TH}>세션</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.events.map((event, index) => (
+                  <tr
+                    key={`${event.sessionId}-${event.occurredAt}-${index}`}
+                    className={ROW}
+                  >
+                    <td className={TD}>{formatKst(event.occurredAt)}</td>
+                    <td className={TD}>{usageEventLabel(event.eventType)}</td>
+                    <td className="p-2 min-w-40">
+                      {vodTitle(event.vodTitle, event.vodId)}
+                    </td>
+                    <td className={TD}>{formatPosition(event.positionSec)}</td>
+                    <td className={TD}>{event.userName ?? '(익명)'}</td>
+                    <td className={`${TD} font-mono text-xs`}>
+                      {event.sessionId.slice(0, 8)}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {data.events.map((event, index) => (
-                    <tr
-                      key={`${event.sessionId}-${event.occurredAt}-${index}`}
-                      className={ROW}
-                    >
-                      <td className={TD}>{formatKst(event.occurredAt)}</td>
-                      <td className={TD}>{usageEventLabel(event.eventType)}</td>
-                      <td className="p-2 min-w-40">
-                        {vodTitle(event.vodTitle, event.vodId)}
-                      </td>
-                      <td className={TD}>
-                        {formatPosition(event.positionSec)}
-                      </td>
-                      <td className={TD}>{event.userName ?? '(익명)'}</td>
-                      <td className={`${TD} font-mono text-xs`}>
-                        {event.sessionId.slice(0, 8)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </Section>
+                ))}
+              </tbody>
+            </table>
+          </Section>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">이용권 활성화 안내</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-3 gap-3">
-                  <StatCard
-                    label="안내 노출"
-                    value={data.summary.pass.promptShown}
-                  />
-                  <StatCard
-                    label="활성화 성공"
-                    value={data.summary.pass.activated}
-                  />
-                  <StatCard
-                    label="활성화 실패"
-                    value={data.summary.pass.failed}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">이용권 활성화 안내</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-3">
+                <StatCard
+                  label="안내 노출"
+                  value={data.summary.pass.promptShown}
+                />
+                <StatCard
+                  label="활성화 성공"
+                  value={data.summary.pass.activated}
+                />
+                <StatCard
+                  label="활성화 실패"
+                  value={data.summary.pass.failed}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }

@@ -21,6 +21,7 @@ describe('usePageUsageLog', () => {
     jest.clearAllMocks();
     jest.useFakeTimers();
     window.history.pushState({}, '', '/vod/7');
+    sessionStorage.clear();
   });
 
   afterEach(() => jest.useRealTimers());
@@ -33,6 +34,7 @@ describe('usePageUsageLog', () => {
       type: 'page_view',
       vodId: 7,
       pagePath: '/vod/7',
+      detail: { from: '' },
     });
   });
 

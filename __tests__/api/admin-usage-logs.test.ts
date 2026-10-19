@@ -4,7 +4,13 @@ import { GET } from '@/app/api/admin/usage-logs/route';
 import { createHmac } from 'node:crypto';
 import { NextRequest } from 'next/server';
 import { createAdminSession } from '@/lib/adminSession';
-import { getUsageRecent, getUsageSummary, getUsageUsers } from '@/lib/kv';
+import {
+  getUsageRecent,
+  getUsageSummary,
+  getUsageUserEvents,
+  getUsageUsers,
+} from '@/lib/kv';
+import { usageLogKey } from '@/lib/usageLogIdentity';
 import {
   UsageLogForbiddenError,
   UsageLogNotConfiguredError,
@@ -17,6 +23,9 @@ const mockSummary = getUsageSummary as jest.MockedFunction<
 >;
 const mockRecent = getUsageRecent as jest.MockedFunction<typeof getUsageRecent>;
 const mockUsers = getUsageUsers as jest.MockedFunction<typeof getUsageUsers>;
+const mockUserEvents = getUsageUserEvents as jest.MockedFunction<
+  typeof getUsageUserEvents
+>;
 
 const BASE = 'http://localhost/api/admin/usage-logs';
 const TOKEN = 'b'.repeat(64);
@@ -350,5 +359,95 @@ describe('GET /api/admin/usage-logs 오류 매핑', () => {
       const res = await GET(adminReq('?view=summary'));
       expect(await res.text()).not.toContain(TOKEN);
     }
+  });
+});
+
+describe('GET /api/admin/usage-logs view=user (유저 검색)', () => {
+  const originalHashSecret = process.env.USAGE_LOG_HASH_SECRET;
+
+  beforeEach(() => {
+    process.env.USAGE_LOG_HASH_SECRET = 'hash-secret-1';
+    mockUserEvents.mockResolvedValue({ events: [], truncated: false });
+  });
+
+  afterEach(() => {
+    if (originalHashSecret === undefined) {
+      delete process.env.USAGE_LOG_HASH_SECRET;
+    } else {
+      process.env.USAGE_LOG_HASH_SECRET = originalHashSecret;
+    }
+  });
+
+  it('이름만 주면 이름 부분 일치로 조회하고 키는 쓰지 않는다', async () => {
+    const res = await GET(adminReq('?view=user&name=%20임성빈%20&days=7'));
+
+    expect(res.status).toBe(200);
+    expect(mockUserEvents).toHaveBeenCalledWith({
+      name: '임성빈',
+      userKey: null,
+      days: 7,
+    });
+    expect(await res.json()).toEqual({ events: [], truncated: false });
+  });
+
+  it('이름과 전화번호를 주면 서버가 만든 키로 정확히 조회한다', async () => {
+    const res = await GET(
+      adminReq('?view=user&name=임성빈&phone=010-1234-5678&days=30'),
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockUserEvents).toHaveBeenCalledWith({
+      name: '임성빈',
+      userKey: usageLogKey('phone:임성빈:01012345678'),
+      days: 30,
+    });
+  });
+
+  it('전화번호만 주면 400 이고 조회하지 않는다 (전화번호는 저장되지 않는다)', async () => {
+    const res = await GET(adminReq('?view=user&phone=01012345678'));
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).message).toContain('이름도 함께');
+    expect(mockUserEvents).not.toHaveBeenCalled();
+  });
+
+  it('이름도 전화번호도 없으면 400 이다', async () => {
+    const res = await GET(adminReq('?view=user'));
+
+    expect(res.status).toBe(400);
+    expect(mockUserEvents).not.toHaveBeenCalled();
+  });
+
+  it('USAGE_LOG_HASH_SECRET 이 없으면 전화번호 검색은 400 안내다', async () => {
+    delete process.env.USAGE_LOG_HASH_SECRET;
+
+    const res = await GET(adminReq('?view=user&name=임성빈&phone=01012345678'));
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).message).toContain('USAGE_LOG_HASH_SECRET');
+    expect(mockUserEvents).not.toHaveBeenCalled();
+  });
+
+  it('이름이 아주 길어도 100자로 자른다', async () => {
+    await GET(adminReq(`?view=user&name=${'가'.repeat(150)}`));
+
+    const call = mockUserEvents.mock.calls[0][0];
+    expect(call.name).toHaveLength(100);
+  });
+
+  it('로그인 세션이 없으면 401 이다', async () => {
+    const res = await GET(new NextRequest(`${BASE}?view=user&name=a`));
+
+    expect(res.status).toBe(401);
+    expect(mockUserEvents).not.toHaveBeenCalled();
+  });
+
+  it('함수가 아직 만들어지지 않은 등 저장소 오류는 502 이고 원문을 싣지 않는다', async () => {
+    mockUserEvents.mockRejectedValue(new UsageLogQueryError('PGRST202'));
+
+    const res = await GET(adminReq('?view=user&name=임성빈'));
+
+    expect(res.status).toBe(502);
+    expect(JSON.stringify(await res.json())).not.toContain('PGRST202');
   });
 });

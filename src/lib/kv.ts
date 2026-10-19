@@ -15,12 +15,14 @@ import {
   clampUsageLimit,
   parseUsageRecent,
   parseUsageSummary,
+  parseUsageUserEvents,
   parseUsageUsers,
 } from './usageLogAdmin';
 import type {
   UsageRecentEvent,
   UsageSummary,
   UsageUser,
+  UsageUserEvents,
 } from './usageLogAdmin';
 
 function getSupabase() {
@@ -606,8 +608,17 @@ export async function insertUsageLogs(rows: UsageLogRow[]): Promise<void> {
 // 읽기는 RLS 때문에 공개 키로 막혀 있다. docs/supabase-usage-log-admin.sql 의 SECURITY DEFINER 함수를
 // 서버 전용 토큰(USAGE_LOG_READ_TOKEN)과 함께 호출한다. 토큰은 이 함수 밖으로 나가지 않는다.
 async function callUsageLogRpc(
-  fn: 'vod_usage_summary' | 'vod_usage_recent' | 'vod_usage_users',
-  args: { p_days?: number; p_limit?: number },
+  fn:
+    | 'vod_usage_summary'
+    | 'vod_usage_recent'
+    | 'vod_usage_users'
+    | 'vod_usage_user_events',
+  args: {
+    p_days?: number;
+    p_limit?: number;
+    p_name?: string | null;
+    p_user_key?: string | null;
+  },
 ): Promise<unknown> {
   const token = process.env.USAGE_LOG_READ_TOKEN?.trim();
   if (!token) throw new UsageLogNotConfiguredError();
@@ -649,4 +660,23 @@ export async function getUsageUsers(
     p_limit: clampUsageLimit(limit),
   });
   return parseUsageUsers(data);
+}
+
+/**
+ * 특정 사용자의 이벤트를 시간순으로 돌려준다. 이름은 부분 일치, 이용자 키는 정확히 일치한다.
+ * 키가 있으면 이름은 쓰지 않는다. `vod_usage_user_events` 함수(docs/supabase-usage-log-user-events.sql)가 필요하다.
+ */
+export async function getUsageUserEvents(options: {
+  name?: string | null;
+  userKey?: string | null;
+  days: number;
+  limit?: number;
+}): Promise<UsageUserEvents> {
+  const data = await callUsageLogRpc('vod_usage_user_events', {
+    p_name: options.name ?? null,
+    p_user_key: options.userKey ?? null,
+    p_days: clampUsageDays(options.days),
+    p_limit: Math.min(Math.max(Math.trunc(options.limit ?? 1000), 1), 2000),
+  });
+  return parseUsageUserEvents(data);
 }
