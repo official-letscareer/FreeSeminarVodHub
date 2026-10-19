@@ -296,8 +296,10 @@ DELETE FROM vod_usage_logs WHERE occurred_at < NOW() - INTERVAL '180 days';
 
 #### 어드민 조회 (이용 로그 화면)
 
-관리자는 `/admin/vod/usage` 에서 기간(7일·30일·90일)별 집계를 본다. 기존 VOD 관리 화면(`/admin/vod`)
-헤더의 「이용 로그」 버튼으로 들어간다. 화면은 `GET /api/admin/usage-logs?view=summary|recent|users&days=&limit=`
+관리자는 `/admin/vod/usage` 에서 기간(7일·30일·90일)별 집계를 본다. 어드민은 왼쪽 사이드바 레이아웃
+(`src/app/admin/vod/layout.tsx`)이고 메뉴는 콘텐츠(VOD 관리 `/admin/vod`, 배너 관리 `/admin/vod/banners`),
+접근 관리(접근 기준 `/access`, 예외 유저 `/users`, 프리미엄 유저 `/premium`), 분석(이용 로그 `/usage`)으로
+나뉜다. 각 화면의 본문은 `src/components/admin/*Section.tsx` 이고 `page.tsx` 는 얇은 래퍼다. 화면은 `GET /api/admin/usage-logs?view=summary|recent|users&days=&limit=`
 를 부르고, 이 라우트가 Supabase RPC 를 호출한다. 자동 갱신은 없고 「새로고침」 버튼만 있다. 시각은 KST 로
 보여준다.
 
@@ -306,7 +308,21 @@ DELETE FROM vod_usage_logs WHERE occurred_at < NOW() - INTERVAL '180 days';
 | `summary` | `vod_usage_summary(p_token, p_days)` | 요약 수치, 영상별(최대 50), 일별 추이, 이용권 활성화 안내 수치 |
 | `recent` | `vod_usage_recent(p_token, p_limit)` | 최근 이벤트 최신순 |
 | `users` | `vod_usage_users(p_token, p_days, p_limit)` | 사용자별 시청 요약, 시청 시간 내림차순 |
+| `user` | `vod_usage_user_events(p_token, p_name, p_user_key, p_days, p_limit)` | 한 사용자의 이벤트 전체(오래된 순, 최대 2000), 영상 제목과 `detail` 포함 |
 
+- `view=user` 는 `name`(필수, 100자까지)과 선택 `phone` 을 받는다. 이름만 주면 `user_name` 부분 일치(ILIKE,
+  `%`·`_` 이스케이프)로 찾고, 전화번호까지 주면 서버가 `usageLogKey('phone:<이름>:<숫자만 전화번호>')` 로
+  만든 키와 정확히 일치하는 이용자만 찾는다. 전화번호 자체는 저장하지 않고 이름+전화번호의 HMAC 키만
+  저장하므로 전화번호만으로는 찾을 수 없다(400). 키를 만들려면 `USAGE_LOG_HASH_SECRET` 이 필요하다(없으면
+  400 안내). 응답은 `{events, truncated}` 이다. 이 view 는 DB 함수가 따로 필요하므로
+  `docs/supabase-usage-log-user-events.sql` 을 Supabase SQL Editor 에서 한 번 실행해야 한다(여러 번 실행해도
+  안전하다). 실행 전에는 502 가 난다.
+- 경로 트리: 화면(`src/components/admin/UserUsageSearch.tsx`)은 `view=user` 결과를 세션별로 나누고
+  `src/lib/usageNavTree.ts` 가 page_view 를 트리로 묶는다. 부모는 `detail.from`(이전 화면 경로)과 경로가 같은
+  가장 가까운 앞선 노드다. 어떤 클릭으로 들어왔는지는 `detail.via`(클릭한 요소의 글자, 80자까지)로 보여준다.
+  이 값은 `src/lib/usageNavigation.ts` 가 클릭을 sessionStorage 에 잠깐(10초) 기억했다가 다음 page_view 의
+  `detail` 에 `{from, via?, ref?}` 로 싣는다. 이 기능 배포 전에 쌓인 page_view 에는 `from` 이 없어 시간
+  순서대로 이어 붙이고 「경로 추정」 으로 표시한다.
 - `days` 는 정수 1~180(기본 30), `limit` 은 1~200(기본 100)으로 보정한다. 잘못된 `view` 는 400 이다.
 - 인증은 `admin_verified=1` 쿠키에 더해 서명된 `admin_session` 쿠키가 있어야 한다. 둘 중 하나라도 없거나
   서명이 틀리거나 만료됐으면 401 이다. `admin_verified=1` 만 직접 만들어 넣은 요청은 통과하지 못한다.

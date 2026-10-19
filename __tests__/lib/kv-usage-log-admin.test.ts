@@ -5,7 +5,12 @@ jest.mock('@/lib/supabase', () => ({
 }));
 
 import { supabase } from '@/lib/supabase';
-import { getUsageRecent, getUsageSummary, getUsageUsers } from '@/lib/kv';
+import {
+  getUsageRecent,
+  getUsageSummary,
+  getUsageUserEvents,
+  getUsageUsers,
+} from '@/lib/kv';
 import {
   UsageLogForbiddenError,
   UsageLogNotConfiguredError,
@@ -347,5 +352,78 @@ describe('getUsageUsers', () => {
     await expect(getUsageUsers(30, 100)).rejects.toBeInstanceOf(
       UsageLogForbiddenError,
     );
+  });
+});
+
+describe('getUsageUserEvents', () => {
+  it('토큰·이름·키·기간을 RPC 인자로 넘기고 이벤트와 detail 을 파싱한다', async () => {
+    mockRpc.mockResolvedValue({
+      data: {
+        truncated: true,
+        events: [
+          {
+            occurred_at: '2026-10-19T01:00:00+00:00',
+            session_id: 's1',
+            auth_method: 'sso',
+            user_name: '임성빈',
+            user_key: 'abc',
+            event_type: 'page_view',
+            vod_id: 28,
+            vod_title: '영상',
+            page_path: '/vod/28',
+            detail: { from: '/vod', via: '영상 카드', skip: { nested: 1 } },
+          },
+          { occurred_at: 1, session_id: 's1', event_type: 'x' },
+        ],
+      },
+      error: null,
+    });
+
+    const result = await getUsageUserEvents({
+      name: '임성빈',
+      userKey: 'abc',
+      days: 999,
+    });
+
+    expect(mockRpc).toHaveBeenCalledWith('vod_usage_user_events', {
+      p_token: TOKEN,
+      p_name: '임성빈',
+      p_user_key: 'abc',
+      p_days: 180,
+      p_limit: 1000,
+    });
+    expect(result.truncated).toBe(true);
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0]).toMatchObject({
+      userKey: 'abc',
+      vodTitle: '영상',
+      detail: { from: '/vod', via: '영상 카드' },
+    });
+    expect(result.events[0].detail).not.toHaveProperty('skip');
+  });
+
+  it('토큰이 없으면 호출하지 않고 미설정 오류다', async () => {
+    delete process.env.USAGE_LOG_READ_TOKEN;
+
+    await expect(
+      getUsageUserEvents({ name: 'a', days: 7 }),
+    ).rejects.toBeInstanceOf(UsageLogNotConfiguredError);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('42501 은 거절 오류로 바꾼다', async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { code: '42501' } });
+
+    await expect(
+      getUsageUserEvents({ name: 'a', days: 7 }),
+    ).rejects.toBeInstanceOf(UsageLogForbiddenError);
+  });
+
+  it('그 밖의 오류는 코드만 담은 조회 오류다', async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { code: 'PGRST202' } });
+
+    await expect(
+      getUsageUserEvents({ name: 'a', days: 7 }),
+    ).rejects.toMatchObject({ code: 'PGRST202' });
   });
 });

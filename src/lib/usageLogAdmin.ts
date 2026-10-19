@@ -144,6 +144,18 @@ export interface UsageRecentEvent {
   sessionId: string;
 }
 
+/** 특정 사용자의 이벤트 한 건. `detail` 에 이동 경로(`from`, `via`, `ref`)가 들어 있다. */
+export interface UsageUserEvent extends UsageRecentEvent {
+  userKey: string | null;
+  detail: Record<string, string | number | boolean | null>;
+}
+
+export interface UsageUserEvents {
+  events: UsageUserEvent[];
+  /** 기간 안에 이벤트가 더 있어 가장 최근 것만 돌려줬다. */
+  truncated: boolean;
+}
+
 export interface UsageUser {
   /** null 이면 익명 */
   userName: string | null;
@@ -308,3 +320,43 @@ export function parseUsageUsers(raw: unknown): UsageUser[] {
     lastSeen: asStringOrNull(row.last_seen),
   }));
 }
+
+function asDetail(value: unknown): UsageUserEvent['detail'] {
+  const detail: UsageUserEvent['detail'] = {};
+  for (const [key, item] of Object.entries(asRecord(value))) {
+    if (
+      item === null ||
+      typeof item === 'string' ||
+      typeof item === 'number' ||
+      typeof item === 'boolean'
+    ) {
+      detail[key] = item;
+    }
+  }
+  return detail;
+}
+
+export function parseUsageUserEvents(raw: unknown): UsageUserEvents {
+  const root = asRecord(raw);
+  const base = parseUsageRecent({ events: root.events });
+  const rows = asRecordList(root.events).filter(
+    (row) =>
+      typeof row.occurred_at === 'string' &&
+      typeof row.event_type === 'string' &&
+      typeof row.session_id === 'string',
+  );
+  const events = base.map((event, index) => ({
+    ...event,
+    userKey: asStringOrNull(rows[index]?.user_key),
+    detail: asDetail(rows[index]?.detail),
+  }));
+  return { events, truncated: root.truncated === true };
+}
+
+/** 유저 검색 조건 안내 문구. 라우트와 화면이 같은 문구를 쓴다. */
+export const USER_SEARCH_NEEDS_NAME_MESSAGE =
+  '전화번호만으로는 찾을 수 없습니다. 전화번호는 저장하지 않고 이름과 합쳐 만든 키만 남기 때문에, 전화번호로 찾으려면 이름도 함께 입력해 주세요.';
+export const USER_SEARCH_NEEDS_KEY_SECRET_MESSAGE =
+  '전화번호로 찾으려면 서버 환경변수 USAGE_LOG_HASH_SECRET 이 필요합니다. 이름만으로 찾아 주세요.';
+export const USER_SEARCH_EMPTY_QUERY_MESSAGE =
+  '이름을 입력해 주세요. 전화번호는 이름과 함께 입력하면 해당 이용자만 정확히 찾습니다.';

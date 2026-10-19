@@ -42,12 +42,17 @@ export default function AdminLoginPage() {
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold text-gray-900">관리자</h1>
-          <p className="mt-2 text-sm text-gray-600">VOD 관리 페이지에 접근합니다</p>
+          <p className="mt-2 text-sm text-gray-600">
+            VOD 관리 페이지에 접근합니다
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               비밀번호
             </label>
             <Input
