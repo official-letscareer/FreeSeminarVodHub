@@ -723,6 +723,28 @@ describe('POST /api/auth/verify', () => {
       });
     });
 
+    it('응답 로그에는 원본 대신 요약(isChallenge, canWatchVod, 신청 건수)만 남긴다', async () => {
+      const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      mockVerifyChallenge({
+        isChallenge: false,
+        programApplications: [APPLICATION],
+      });
+
+      await verify();
+
+      const responseLog = logSpy.mock.calls.find(
+        ([label]) => label === 'verify-challenge response:',
+      );
+      logSpy.mockRestore();
+      expect(responseLog?.[1]).toBe(
+        JSON.stringify({
+          isChallenge: false,
+          canWatchVod: null,
+          programApplications: 1,
+        }),
+      );
+    });
+
     it('신청 내역이 없으면(구버전 서버) 규칙을 조회하지 않는다', async () => {
       mockVerifyChallenge({ isChallenge: false });
 

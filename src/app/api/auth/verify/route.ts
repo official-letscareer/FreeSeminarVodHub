@@ -165,7 +165,6 @@ export async function POST(request: NextRequest) {
         isChallenge = false;
       } else if (res.ok) {
         const data = await res.json();
-        console.log('verify-challenge response:', JSON.stringify(data));
         if (typeof data === 'boolean') {
           isChallenge = data;
         } else if (typeof data?.data === 'boolean') {
@@ -186,6 +185,15 @@ export async function POST(request: NextRequest) {
           );
           if (Array.isArray(data?.optionCodes)) optionCodes = data.optionCodes;
         }
+        // 원본 응답은 찍지 않는다. 신청 내역(구매 내역)이 Vercel 로그에 남기 때문이다. 판정에 쓴 값만 요약한다.
+        console.log(
+          'verify-challenge response:',
+          JSON.stringify({
+            isChallenge,
+            canWatchVod,
+            programApplications: programApplications.length,
+          }),
+        );
       } else {
         const errorBody = await res.text().catch(() => '');
         console.error(
