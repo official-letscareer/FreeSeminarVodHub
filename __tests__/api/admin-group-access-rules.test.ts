@@ -307,7 +307,6 @@ describe('GET /api/admin/group-access-rules/programs', () => {
   beforeEach(() => {
     global.fetch = jest.fn();
     process.env.LETSCAREER_API_URL = 'https://api.example.com';
-    process.env.VOD_ACCESS_SHARED_SECRET = 'shared-secret';
     errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
@@ -317,10 +316,9 @@ describe('GET /api/admin/group-access-rules/programs', () => {
 
   afterAll(() => {
     global.fetch = originalFetch;
-    delete process.env.VOD_ACCESS_SHARED_SECRET;
   });
 
-  it('type 을 그대로 넘기고 비밀 헤더로 호출해 programs 배열을 돌려준다', async () => {
+  it('type 을 그대로 넘겨 인증 헤더 없이 호출하고 programs 배열을 돌려준다', async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: async () => ({ data: { programs: PROGRAMS } }),
@@ -332,9 +330,7 @@ describe('GET /api/admin/group-access-rules/programs', () => {
     expect(await res.json()).toEqual(PROGRAMS);
     expect(global.fetch).toHaveBeenCalledWith(
       'https://api.example.com/api/v1/vod-access/programs?type=LIVE',
-      expect.objectContaining({
-        headers: { 'X-Vod-Access-Secret': 'shared-secret' },
-      }),
+      { cache: 'no-store' },
     );
   });
 
@@ -344,17 +340,11 @@ describe('GET /api/admin/group-access-rules/programs', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it('비밀 env 가 없으면 502 이고 서버를 부르지 않는다', async () => {
-    delete process.env.VOD_ACCESS_SHARED_SECRET;
-    const res = await programsGet(programsReq());
-    expect(res.status).toBe(502);
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it('API URL env 가 없으면 502', async () => {
+  it('API URL env 가 없으면 502 이고 서버를 부르지 않는다', async () => {
     delete process.env.LETSCAREER_API_URL;
     const res = await programsGet(programsReq());
     expect(res.status).toBe(502);
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it('서버가 실패 응답(401 등)이면 502', async () => {
