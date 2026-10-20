@@ -15,6 +15,7 @@ import {
   deleteGroupAccessRule,
 } from '@/lib/kv';
 import type { GroupAccessRule } from '@/lib/types';
+import { createAdminSession } from '@/lib/adminSession';
 
 const mockGetRules = getGroupAccessRules as jest.MockedFunction<
   typeof getGroupAccessRules
@@ -46,7 +47,10 @@ function makeReq(
         }
       : {}),
   });
-  if (admin) req.cookies.set('admin_verified', '1');
+  if (admin) {
+    req.cookies.set('admin_verified', '1');
+    req.cookies.set('admin_session', createAdminSession()!);
+  }
   return req;
 }
 
@@ -82,14 +86,20 @@ const VALID_POST = {
   memo: '  ',
 };
 
+const originalSessionSecret = process.env.ADMIN_SESSION_SECRET;
+
 beforeEach(() => {
   jest.clearAllMocks();
+  process.env.ADMIN_SESSION_SECRET = 'group-access-session-secret-'.repeat(2);
   // 2026-10-12 12:00 KST
   jest.useFakeTimers().setSystemTime(new Date('2026-10-12T03:00:00Z'));
 });
 
 afterEach(() => {
   jest.useRealTimers();
+  if (originalSessionSecret === undefined)
+    delete process.env.ADMIN_SESSION_SECRET;
+  else process.env.ADMIN_SESSION_SECRET = originalSessionSecret;
 });
 
 describe('미인증', () => {
@@ -120,6 +130,14 @@ describe('미인증', () => {
     expect(mockAddRule).not.toHaveBeenCalled();
     expect(mockUpdateRule).not.toHaveBeenCalled();
     expect(mockDeleteRule).not.toHaveBeenCalled();
+  });
+
+  it('서명 세션 없이 admin_verified 만 있으면 POST 는 401 이다', async () => {
+    const req = makeReq('POST', BASE_URL, VALID_POST, false);
+    req.cookies.set('admin_verified', '1');
+    const res = await POST(req);
+    expect(res.status).toBe(401);
+    expect(mockAddRule).not.toHaveBeenCalled();
   });
 });
 
@@ -204,6 +222,7 @@ describe('POST /api/admin/group-access-rules', () => {
       headers: { 'Content-Type': 'application/json' },
     });
     req.cookies.set('admin_verified', '1');
+    req.cookies.set('admin_session', createAdminSession()!);
     const res = await POST(req);
     expect(res.status).toBe(400);
   });

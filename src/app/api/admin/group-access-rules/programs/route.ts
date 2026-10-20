@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ADMIN_SESSION_COOKIE, verifyAdminSession } from '@/lib/adminSession';
 
+// 접근 권한을 만드는 API 라 서명 없는 admin_verified=1 만으로는 통과하지 못한다(누구나 쿠키를 직접
+// 넣을 수 있다). usage-logs 처럼 로그인 때 발급된 서명 세션(admin_session)이 함께 있어야 한다.
 function isAdminAuthorized(request: NextRequest): boolean {
-  return request.cookies.get('admin_verified')?.value === '1';
+  return (
+    request.cookies.get('admin_verified')?.value === '1' &&
+    verifyAdminSession(request.cookies.get(ADMIN_SESSION_COOKIE)?.value)
+  );
 }
 
 function badGateway() {
