@@ -4,9 +4,14 @@ jest.mock('@/lib/sso');
 import { GET as vodListGet } from '@/app/api/vod/route';
 import { GET as vodDetailGet } from '@/app/api/vod/[id]/route';
 import { NextRequest } from 'next/server';
-import { getEnabledVodList, getVodList, getAccessSettings } from '@/lib/kv';
+import {
+  getEnabledVodList,
+  getVodList,
+  getAccessSettings,
+  getGroupAccessRules,
+} from '@/lib/kv';
 import { getSsoUserProfile, SSO_ACCESS_TOKEN_COOKIE } from '@/lib/sso';
-import { AccessSettings } from '@/lib/types';
+import { AccessSettings, GroupAccessRule } from '@/lib/types';
 
 const mockGetEnabledVodList = getEnabledVodList as jest.MockedFunction<
   typeof getEnabledVodList
@@ -105,6 +110,7 @@ describe('GET /api/vod', () => {
         isActiveChallengeParticipant: true,
         optionCodes: [],
         canWatchVod: null,
+        programApplications: [],
       });
       mockGetEnabledVodList.mockResolvedValue(mockList);
 
@@ -142,6 +148,7 @@ describe('GET /api/vod', () => {
         isActiveChallengeParticipant: false,
         optionCodes: [],
         canWatchVod: null,
+        programApplications: [],
       });
       mockGetAccessSettings.mockResolvedValue(OFF_SETTINGS);
       mockGetEnabledVodList.mockResolvedValue(mockList);
@@ -157,6 +164,7 @@ describe('GET /api/vod', () => {
         isActiveChallengeParticipant: false,
         optionCodes: [],
         canWatchVod: null,
+        programApplications: [],
       });
       mockGetAccessSettings.mockResolvedValue({
         requireChallengeParticipation: true,
@@ -178,6 +186,7 @@ describe('GET /api/vod', () => {
         isActiveChallengeParticipant: true,
         optionCodes: ['PLUS1'],
         canWatchVod: null,
+        programApplications: [],
       });
       mockGetAccessSettings.mockResolvedValue({
         requireChallengeParticipation: false,
@@ -197,6 +206,7 @@ describe('GET /api/vod', () => {
         isActiveChallengeParticipant: true,
         optionCodes: ['WFB1'],
         canWatchVod: null,
+        programApplications: [],
       });
       mockGetAccessSettings.mockResolvedValue({
         requireChallengeParticipation: false,
@@ -236,6 +246,7 @@ describe('GET /api/vod', () => {
         isActiveChallengeParticipant: false,
         optionCodes: [],
         canWatchVod: false,
+        programApplications: [],
       });
 
       const res = await vodListGet(makeSsoReq('http://localhost/api/vod'));
@@ -255,6 +266,127 @@ describe('GET /api/vod', () => {
       expect(res.status).toBe(401);
       expect(res.headers.get('set-cookie')).toContain(SSO_ACCESS_TOKEN_COOKIE);
     });
+  });
+});
+
+describe('GET /api/vod — 그룹 접근 규칙', () => {
+  const mockGetGroupAccessRules = getGroupAccessRules as jest.MockedFunction<
+    typeof getGroupAccessRules
+  >;
+
+  const RULE: GroupAccessRule = {
+    id: 1,
+    programType: 'CHALLENGE',
+    programId: 42,
+    programTitle: '10월 챌린지',
+    programStartDate: '2026-10-01T01:00:00+00:00',
+    programEndDate: '2026-10-10T13:00:00+00:00',
+    planTypes: ['BASIC'],
+    graceDays: 7,
+    memo: null,
+    createdAt: '2026-09-01T00:00:00+00:00',
+  };
+
+  function blockedProfile(planType: string | null = 'BASIC') {
+    return {
+      name: '홍길동',
+      isActiveChallengeParticipant: false,
+      optionCodes: [],
+      canWatchVod: false,
+      programApplications: [
+        {
+          programType: 'CHALLENGE' as const,
+          programId: 42,
+          planType,
+          startDate: '2026-10-01T10:00:00',
+          endDate: '2026-10-10T22:00:00',
+        },
+      ],
+    };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // 2026-10-12 12:00 KST. 종료일 10-10 + 7일 안이다.
+    jest.useFakeTimers().setSystemTime(new Date('2026-10-12T03:00:00Z'));
+    mockGetAccessSettings.mockResolvedValue(PASS_GATE_ON);
+    mockGetEnabledVodList.mockResolvedValue(mockList);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('이용권이 없어도 규칙에 맞는 신청이 있으면 통과한다', async () => {
+    mockGetSsoUserProfile.mockResolvedValue(blockedProfile('BASIC'));
+    mockGetGroupAccessRules.mockResolvedValue([RULE]);
+
+    const res = await vodListGet(makeSsoReq('http://localhost/api/vod'));
+
+    expect(res.status).toBe(200);
+    expect(mockGetGroupAccessRules).toHaveBeenCalledTimes(1);
+  });
+
+  it('규칙에 맞지 않으면 기존 사유(ineligible)대로 401 이고 SSO 쿠키는 지우지 않는다', async () => {
+    mockGetSsoUserProfile.mockResolvedValue(blockedProfile('LIGHT'));
+    mockGetGroupAccessRules.mockResolvedValue([RULE]);
+
+    const res = await vodListGet(makeSsoReq('http://localhost/api/vod'));
+
+    expect(res.status).toBe(401);
+    expect(res.headers.get('set-cookie') ?? '').not.toContain(
+      SSO_ACCESS_TOKEN_COOKIE,
+    );
+  });
+
+  it('기존 챌린지 필터에서 막혀도(게이트 OFF) 규칙에 맞으면 통과한다', async () => {
+    mockGetAccessSettings.mockResolvedValue({
+      ...OFF_SETTINGS,
+      requireChallengeParticipation: true,
+    });
+    mockGetSsoUserProfile.mockResolvedValue(blockedProfile('BASIC'));
+    mockGetGroupAccessRules.mockResolvedValue([RULE]);
+
+    const res = await vodListGet(makeSsoReq('http://localhost/api/vod'));
+
+    expect(res.status).toBe(200);
+  });
+
+  it('규칙 조회가 실패하면 기존 판정(401)을 그대로 돌려준다', async () => {
+    mockGetSsoUserProfile.mockResolvedValue(blockedProfile('BASIC'));
+    mockGetGroupAccessRules.mockRejectedValue(
+      new Error('GROUP_ACCESS_RULES_TOKEN 이 설정되지 않았습니다.'),
+    );
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const res = await vodListGet(makeSsoReq('http://localhost/api/vod'));
+
+    expect(res.status).toBe(401);
+    errorSpy.mockRestore();
+  });
+
+  it('이용권으로 통과하면 규칙을 조회하지 않는다', async () => {
+    mockGetSsoUserProfile.mockResolvedValue({
+      ...blockedProfile('BASIC'),
+      canWatchVod: true,
+    });
+
+    const res = await vodListGet(makeSsoReq('http://localhost/api/vod'));
+
+    expect(res.status).toBe(200);
+    expect(mockGetGroupAccessRules).not.toHaveBeenCalled();
+  });
+
+  it('신청 내역이 없으면(구버전 서버) 규칙을 조회하지 않고 401', async () => {
+    mockGetSsoUserProfile.mockResolvedValue({
+      ...blockedProfile(),
+      programApplications: [],
+    });
+
+    const res = await vodListGet(makeSsoReq('http://localhost/api/vod'));
+
+    expect(res.status).toBe(401);
+    expect(mockGetGroupAccessRules).not.toHaveBeenCalled();
   });
 });
 
@@ -310,6 +442,7 @@ describe('GET /api/vod/[id]', () => {
         isActiveChallengeParticipant: true,
         optionCodes: [],
         canWatchVod: null,
+        programApplications: [],
       });
       mockGetVodList.mockResolvedValue(mockList);
 
@@ -337,6 +470,7 @@ describe('GET /api/vod/[id]', () => {
         isActiveChallengeParticipant: false,
         optionCodes: [],
         canWatchVod: null,
+        programApplications: [],
       });
       mockGetAccessSettings.mockResolvedValue({
         requireChallengeParticipation: true,
@@ -368,6 +502,7 @@ describe('GET /api/vod/[id]', () => {
         isActiveChallengeParticipant: false,
         optionCodes: [],
         canWatchVod: false,
+        programApplications: [],
       });
 
       const res = await vodDetailGet(makeSsoReq('http://localhost/api/vod/1'), {

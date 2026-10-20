@@ -1,3 +1,6 @@
+import { parseProgramApplications } from './groupAccess';
+import type { ProgramApplication } from './types';
+
 /**
  * SSO(LC-3208) 관련 서버 전용 유틸.
  *
@@ -92,6 +95,11 @@ export interface SsoUserProfile {
    * 구버전 서버) null — 호출한 쪽이 기존 판정으로 되돌아가야 한다.
    */
   canWatchVod: boolean | null;
+  /**
+   * 사용자의 챌린지·LIVE 신청 내역. 그룹 접근 규칙 대조에 쓴다. 응답에 필드가 없으면(구버전
+   * 서버) 빈 배열이라 규칙이 아무도 통과시키지 않을 뿐 기존 판정은 그대로다.
+   */
+  programApplications: ProgramApplication[];
 }
 
 /**
@@ -129,6 +137,7 @@ export async function getSsoUserProfile(
       optionCodes: Array.isArray(data.optionCodes) ? data.optionCodes : [],
       canWatchVod:
         typeof data.canWatchVod === 'boolean' ? data.canWatchVod : null,
+      programApplications: parseProgramApplications(data.programApplications),
     };
   } catch {
     return null;

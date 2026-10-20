@@ -34,6 +34,7 @@ function profile(canWatchVod: boolean | null, participating = false) {
     isActiveChallengeParticipant: participating,
     optionCodes: [],
     canWatchVod,
+    programApplications: [],
   };
 }
 

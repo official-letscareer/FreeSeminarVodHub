@@ -41,6 +41,7 @@ describe('getSsoUserProfile', () => {
       isActiveChallengeParticipant: true,
       optionCodes: ['WFB1', 'LFB2'],
       canWatchVod: null,
+      programApplications: [],
     });
     expect(global.fetch).toHaveBeenCalledWith(
       'https://api.example.com/api/v2/user/sso-profile',
@@ -67,6 +68,7 @@ describe('getSsoUserProfile', () => {
       isActiveChallengeParticipant: false,
       optionCodes: [],
       canWatchVod: null,
+      programApplications: [],
     });
   });
 
@@ -104,6 +106,68 @@ describe('getSsoUserProfile', () => {
         expect(result?.canWatchVod).toBeNull();
       },
     );
+  });
+
+  describe('programApplications(그룹 접근 규칙)', () => {
+    function mockProfile(data: Record<string, unknown>) {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ status: 200, message: 'OK', data }),
+      });
+    }
+
+    const challenge = {
+      programType: 'CHALLENGE',
+      programId: 42,
+      planType: 'BASIC',
+      startDate: '2026-10-20T10:00:00',
+      endDate: '2026-11-20T22:00:00',
+    };
+
+    it('신청 내역을 그대로 읽는다 (LIVE 의 planType null 포함)', async () => {
+      const live = {
+        programType: 'LIVE',
+        programId: 7,
+        planType: null,
+        startDate: '2026-10-25T19:00:00',
+        endDate: '2026-10-25T21:00:00',
+      };
+      mockProfile({ name: '홍길동', programApplications: [challenge, live] });
+
+      const result = await getSsoUserProfile('token');
+
+      expect(result?.programApplications).toEqual([challenge, live]);
+    });
+
+    it.each([[undefined], [null], ['[]'], [{}]])(
+      '필드가 없거나 배열이 아니면(%p) 빈 배열',
+      async (value) => {
+        mockProfile({ name: '홍길동', programApplications: value });
+        const result = await getSsoUserProfile('token');
+        expect(result?.programApplications).toEqual([]);
+      },
+    );
+
+    it('형식이 틀린 원소만 버리고 나머지는 남긴다', async () => {
+      mockProfile({
+        name: '홍길동',
+        programApplications: [
+          challenge,
+          { ...challenge, programType: 'REPORT' },
+          { ...challenge, programId: '42' },
+          { ...challenge, planType: 3 },
+          { ...challenge, startDate: '2026-10-20T10:00:00+09:00' },
+          { ...challenge, endDate: '2026-13-45T99:00:00' },
+          { ...challenge, endDate: undefined },
+          null,
+          'x',
+        ],
+      });
+
+      const result = await getSsoUserProfile('token');
+
+      expect(result?.programApplications).toEqual([challenge]);
+    });
   });
 
   it('401(만료·위조 토큰) 응답이면 null 반환', async () => {

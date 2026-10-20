@@ -98,6 +98,7 @@ const SSO_PROFILE = {
   isActiveChallengeParticipant: false,
   optionCodes: [],
   canWatchVod: false,
+  programApplications: [],
 };
 
 const originalSecret = process.env.USAGE_LOG_HASH_SECRET;

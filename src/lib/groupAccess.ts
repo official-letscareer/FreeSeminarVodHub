@@ -17,6 +17,52 @@ function endOfGraceKst(endDate: string, graceDays: number): Date {
   );
 }
 
+// 오프셋 없는 LocalDateTime 만 받는다. 오프셋이 붙어 오면 +09:00 을 덧붙일 수 없어 버린다.
+const LOCAL_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?$/;
+
+function isLocalDateTime(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    LOCAL_DATE_TIME.test(value) &&
+    !Number.isNaN(parseKstDateTime(value).getTime())
+  );
+}
+
+function toProgramApplication(raw: unknown): ProgramApplication | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const item = raw as Record<string, unknown>;
+  if (item.programType !== 'CHALLENGE' && item.programType !== 'LIVE') {
+    return null;
+  }
+  if (!Number.isInteger(item.programId)) return null;
+  if (item.planType != null && typeof item.planType !== 'string') return null;
+  if (!isLocalDateTime(item.startDate) || !isLocalDateTime(item.endDate)) {
+    return null;
+  }
+  return {
+    programType: item.programType,
+    programId: item.programId as number,
+    planType: (item.planType as string | null | undefined) ?? null,
+    startDate: item.startDate,
+    endDate: item.endDate,
+  };
+}
+
+/**
+ * 렛커 서버 응답의 `programApplications` 를 읽는다. SSO 프로필과 verify-challenge 가 공유한다.
+ * 필드가 없거나 배열이 아니면(구버전 서버) 빈 배열이고, 형식이 틀린 원소는 그 원소만 버린다 —
+ * 한 건이 깨졌다고 나머지 신청까지 판정에서 빠지지 않게 한다.
+ */
+export function parseProgramApplications(raw: unknown): ProgramApplication[] {
+  if (!Array.isArray(raw)) return [];
+  const applications: ProgramApplication[] = [];
+  for (const item of raw) {
+    const application = toProgramApplication(item);
+    if (application) applications.push(application);
+  }
+  return applications;
+}
+
 function isPlanMatched(
   rule: GroupAccessRule,
   planType: string | null,
