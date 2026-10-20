@@ -1,11 +1,37 @@
 import { NextRequest } from 'next/server';
 import { SSO_ACCESS_TOKEN_COOKIE, getSsoUserProfile } from './sso';
-import { getAccessSettings } from './kv';
+import { getAccessSettings, getGroupAccessRules } from './kv';
 import { isEligibleForAccess } from './accessControl';
+import { findGroupAccessEndsAt } from './groupAccess';
+import type { ProgramApplication } from './types';
 
 export type VodAccessResult =
   | { authorized: true }
   | { authorized: false; reason: 'no-auth' | 'invalid-token' | 'ineligible' };
+
+const INELIGIBLE: VodAccessResult = { authorized: false, reason: 'ineligible' };
+
+/**
+ * 기존 판정에서 막힌 사용자를 그룹 접근 규칙과 대조한다. 통과 경로에는 Supabase 조회를 더하지
+ * 않으려고 막혔을 때만 부른다. 신청 내역이 없으면 규칙을 조회하지 않는다.
+ *
+ * 규칙 조회가 실패하면 기존 판정(ineligible)을 그대로 돌려준다 — 규칙은 기존 판정 위에 더하는
+ * 통과 경로라, 실패가 기존 결과를 바꾸지 않게 한다.
+ */
+async function checkGroupAccess(
+  applications: ProgramApplication[],
+): Promise<VodAccessResult> {
+  if (applications.length === 0) return INELIGIBLE;
+  try {
+    const rules = await getGroupAccessRules();
+    return findGroupAccessEndsAt(applications, rules, new Date())
+      ? { authorized: true }
+      : INELIGIBLE;
+  } catch (err) {
+    console.error('getGroupAccessRules error:', err);
+    return INELIGIBLE;
+  }
+}
 
 /**
  * `/api/vod`, `/api/vod/[id]` 가 공유하는 VOD 접근 판정(LC-3208).
@@ -40,7 +66,7 @@ export async function checkVodAccess(
   if (settings.requireVodPass && profile.canWatchVod !== null) {
     return profile.canWatchVod
       ? { authorized: true }
-      : { authorized: false, reason: 'ineligible' };
+      : checkGroupAccess(profile.programApplications);
   }
 
   const eligible = isEligibleForAccess(
@@ -49,7 +75,7 @@ export async function checkVodAccess(
     profile.optionCodes,
   );
   if (!eligible) {
-    return { authorized: false, reason: 'ineligible' };
+    return checkGroupAccess(profile.programApplications);
   }
 
   return { authorized: true };

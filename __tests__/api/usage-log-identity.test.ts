@@ -7,18 +7,15 @@ jest.mock('@/lib/sso', () => ({
 import { createHmac } from 'node:crypto';
 import { NextRequest } from 'next/server';
 import { POST as verify } from '@/app/api/auth/verify/route';
-import { POST as verifyMembership } from '@/app/api/auth/verify-membership/route';
 import { POST as writeLog } from '@/app/api/vod/log/route';
 import {
   checkRateLimit,
   getAccessSettings,
   insertUsageLogs,
   isAllowedUser,
-  isPremiumUser,
 } from '@/lib/kv';
 
 const mockIsAllowedUser = isAllowedUser as jest.Mock;
-const mockIsPremiumUser = isPremiumUser as jest.Mock;
 const mockCheckRateLimit = checkRateLimit as jest.Mock;
 const mockGetAccessSettings = getAccessSettings as jest.Mock;
 const mockInsert = insertUsageLogs as jest.Mock;
@@ -69,7 +66,6 @@ describe('이용 로그 식별 쿠키 (LC-3438)', () => {
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 4 });
     mockGetAccessSettings.mockResolvedValue(SETTINGS_OFF);
     mockIsAllowedUser.mockResolvedValue(true);
-    mockIsPremiumUser.mockResolvedValue(true);
     mockInsert.mockResolvedValue(undefined);
     jest.spyOn(console, 'log').mockImplementation(() => {});
   });
@@ -81,10 +77,7 @@ describe('이용 로그 식별 쿠키 (LC-3438)', () => {
     else process.env.USAGE_LOG_HASH_SECRET = originalSecret;
   });
 
-  describe.each([
-    ['/api/auth/verify', verify],
-    ['/api/auth/verify-membership', verifyMembership],
-  ])('POST %s', (url, handler) => {
+  describe.each([['/api/auth/verify', verify]])('POST %s', (url, handler) => {
     it('성공하면 응답 본문은 그대로이고 서명된 httpOnly 쿠키 vod_log_id 하나만 더 심는다', async () => {
       const res = await handler(
         post(url, { name: ' 홍길동 ', phoneNum: PHONE }),
@@ -142,7 +135,6 @@ describe('이용 로그 식별 쿠키 (LC-3438)', () => {
 
     it('통과하지 못하면 어떤 쿠키도 심지 않는다', async () => {
       mockIsAllowedUser.mockResolvedValue(false);
-      mockIsPremiumUser.mockResolvedValue(false);
       global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 404 });
 
       const res = await handler(post(url, { name: '홍길동', phoneNum: PHONE }));

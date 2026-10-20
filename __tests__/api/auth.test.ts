@@ -546,6 +546,27 @@ describe('POST /api/auth/verify', () => {
     });
   });
 
+  it('응답 로그에는 원본 대신 요약(isChallenge, canWatchVod)만 남긴다', async () => {
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: { isChallenge: false, optionCodes: ['OPT-1'] },
+      }),
+    });
+
+    await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+
+    const responseLog = logSpy.mock.calls.find(
+      ([label]) => label === 'verify-challenge response:',
+    );
+    logSpy.mockRestore();
+    expect(responseLog?.[1]).toBe(
+      JSON.stringify({ isChallenge: false, canWatchVod: null }),
+    );
+  });
+
   // ─── 계정 존재 여부 비노출 ─────────────────────────────────────────
   // 이 경로는 비인증이다. 통과하지 못한 사유(가입 안 됨 / 가입했지만 이용권 없음 / 게이트
   // 상태)가 응답에서 갈리면 이름+전화번호 조합으로 가입 여부를 알아낼 수 있다.

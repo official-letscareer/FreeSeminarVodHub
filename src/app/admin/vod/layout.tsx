@@ -46,9 +46,9 @@ const NAV_GROUPS: NavGroup[] = [
         description: '기준과 무관하게 허용',
       },
       {
-        href: '/admin/vod/premium',
-        label: '프리미엄 유저',
-        description: '멤버십 명단',
+        href: '/admin/vod/group-access',
+        label: '그룹 접근 규칙',
+        description: '프로그램 신청자 전체에게 기간 한정 접근',
       },
     ],
   },

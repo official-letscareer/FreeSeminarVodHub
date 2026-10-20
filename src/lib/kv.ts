@@ -2,9 +2,9 @@ import { supabase } from './supabase';
 import {
   VodItem,
   AllowedUser,
-  PremiumUser,
   Banner,
   AccessSettings,
+  GroupAccessRule,
 } from './types';
 import type { UsageDetail, UsageEventType } from './usageLogEvents';
 import {
@@ -239,85 +239,87 @@ export async function isAllowedUser(
   return (data?.length ?? 0) > 0;
 }
 
-// ─── 프리미엄 멤버십 유저 CRUD ────────────────────────────────────────────────
-function toPremiumUser(row: Record<string, unknown>): PremiumUser {
+// ─── 그룹 접근 규칙 CRUD ─────────────────────────────────────────────────────
+function toGroupAccessRule(row: Record<string, unknown>): GroupAccessRule {
   return {
     id: row.id as number,
-    name: row.name as string,
-    phoneNum: row.phone_num as string,
+    programType: row.program_type as GroupAccessRule['programType'],
+    programId: row.program_id as number,
+    programTitle: (row.program_title as string) ?? '',
+    programStartDate: row.program_start_date as string,
+    programEndDate: row.program_end_date as string,
+    planTypes: Array.isArray(row.plan_types)
+      ? (row.plan_types as string[])
+      : [],
+    graceDays: row.grace_days as number,
+    memo: (row.memo as string) ?? null,
     createdAt: row.created_at as string,
   };
 }
 
-export async function getPremiumUsers(): Promise<PremiumUser[]> {
-  const { data, error } = await getSupabase()
-    .from('premium_users')
-    .select('*')
-    .order('created_at', { ascending: false });
+// 규칙 테이블은 RLS 를 켜고 정책을 두지 않아 공개 키로는 직접 읽지도 쓰지도 못한다. 공개 키로 누구나
+// 규칙을 넣어 자기 접근을 열 수 있게 되기 때문이다. 토큰을 확인하는 함수(docs/group-access-rules.sql)로만
+// 접근한다. 토큰이 없으면 빈 목록이 아니라 오류를 던진다 — 판정 경로가 잡아 기존 판정을 유지한다.
+async function callGroupAccessRulesRpc(
+  fn:
+    | 'group_access_rules_list'
+    | 'group_access_rules_add'
+    | 'group_access_rules_update'
+    | 'group_access_rules_delete',
+  args: Record<string, unknown>,
+): Promise<unknown> {
+  const token = process.env.GROUP_ACCESS_RULES_TOKEN?.trim();
+  if (!token) {
+    throw new Error('GROUP_ACCESS_RULES_TOKEN 이 설정되지 않았습니다.');
+  }
 
+  const { data, error } = await getSupabase().rpc(fn, {
+    p_token: token,
+    ...args,
+  });
   if (error) throw error;
-  return (data ?? []).map(toPremiumUser);
+  return data;
 }
 
-export async function addPremiumUser(
-  name: string,
-  phoneNum: string,
-): Promise<PremiumUser> {
-  const { data, error } = await getSupabase()
-    .from('premium_users')
-    .insert({ name, phone_num: phoneNum })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return toPremiumUser(data);
+export async function getGroupAccessRules(): Promise<GroupAccessRule[]> {
+  const data = await callGroupAccessRulesRpc('group_access_rules_list', {});
+  return Array.isArray(data)
+    ? data.map((row) => toGroupAccessRule(row as Record<string, unknown>))
+    : [];
 }
 
-export async function deletePremiumUser(id: number): Promise<void> {
-  const { error } = await getSupabase()
-    .from('premium_users')
-    .delete()
-    .eq('id', id);
-  if (error) throw error;
+export async function addGroupAccessRule(
+  rule: Omit<GroupAccessRule, 'id' | 'createdAt'>,
+): Promise<GroupAccessRule> {
+  const data = await callGroupAccessRulesRpc('group_access_rules_add', {
+    p_program_type: rule.programType,
+    p_program_id: rule.programId,
+    p_program_title: rule.programTitle,
+    p_program_start_date: rule.programStartDate,
+    p_program_end_date: rule.programEndDate,
+    p_plan_types: rule.planTypes,
+    p_grace_days: rule.graceDays,
+    p_memo: rule.memo,
+  });
+  return toGroupAccessRule(data as Record<string, unknown>);
 }
 
-export async function deletePremiumUsers(ids: number[]): Promise<void> {
-  if (ids.length === 0) return;
-  const { error } = await getSupabase()
-    .from('premium_users')
-    .delete()
-    .in('id', ids);
-  if (error) throw error;
-}
-
-export async function updatePremiumUser(
+// 플랜·N·메모만 바꾼다. 프로그램은 바꾸지 않는다(다른 프로그램이면 규칙을 새로 만든다).
+// 함수가 세 값을 그대로 덮어써서 셋 다 받는다 — 메모를 비우는 것(null)과 그대로 두는 것을 구분하지 않는다.
+export async function updateGroupAccessRule(
   id: number,
-  data: { name?: string; phoneNum?: string },
+  data: { planTypes: string[]; graceDays: number; memo: string | null },
 ): Promise<void> {
-  const updates: Record<string, unknown> = {};
-  if (data.name !== undefined) updates.name = data.name;
-  if (data.phoneNum !== undefined) updates.phone_num = data.phoneNum;
-  if (Object.keys(updates).length === 0) return;
-  const { error } = await getSupabase()
-    .from('premium_users')
-    .update(updates)
-    .eq('id', id);
-  if (error) throw error;
+  await callGroupAccessRulesRpc('group_access_rules_update', {
+    p_id: id,
+    p_plan_types: data.planTypes,
+    p_grace_days: data.graceDays,
+    p_memo: data.memo,
+  });
 }
 
-export async function isPremiumUser(
-  name: string,
-  phoneNum: string,
-): Promise<boolean> {
-  const { data, error } = await getSupabase()
-    .from('premium_users')
-    .select('id')
-    .eq('name', name)
-    .eq('phone_num', phoneNum)
-    .limit(1);
-
-  if (error) throw error;
-  return (data?.length ?? 0) > 0;
+export async function deleteGroupAccessRule(id: number): Promise<void> {
+  await callGroupAccessRulesRpc('group_access_rules_delete', { p_id: id });
 }
 
 // ─── Banner CRUD ─────────────────────────────────────────────────────────────

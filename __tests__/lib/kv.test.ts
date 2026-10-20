@@ -21,6 +21,10 @@ import {
   getAccessSettings,
   updateAccessSettings,
   insertUsageLogs,
+  getGroupAccessRules,
+  addGroupAccessRule,
+  updateGroupAccessRule,
+  deleteGroupAccessRule,
 } from '@/lib/kv';
 
 const mockFrom = supabase!.from as jest.Mock;
@@ -544,6 +548,138 @@ describe('kv (Supabase)', () => {
       mockFrom.mockReturnValue(createChain({ error }));
 
       await expect(insertUsageLogs([row])).rejects.toBe(error);
+    });
+  });
+  describe('그룹 접근 규칙 (토큰 확인 함수로만 접근)', () => {
+    const mockRpc = jest.fn();
+    const row = {
+      id: 1,
+      program_type: 'CHALLENGE',
+      program_id: 42,
+      program_title: '10월 챌린지',
+      program_start_date: '2026-10-20T01:00:00+00:00',
+      program_end_date: '2026-11-20T01:00:00+00:00',
+      plan_types: ['BASIC', 'PREMIUM'],
+      grace_days: 7,
+      memo: '이전 구매자',
+      created_at: '2026-10-20T00:00:00+00:00',
+    };
+
+    beforeEach(() => {
+      (supabase as unknown as { rpc: jest.Mock }).rpc = mockRpc;
+      mockRpc.mockReset();
+      process.env.GROUP_ACCESS_RULES_TOKEN = 'secret-token';
+    });
+
+    afterAll(() => {
+      delete process.env.GROUP_ACCESS_RULES_TOKEN;
+    });
+
+    it('getGroupAccessRules — 목록 함수를 토큰과 함께 부르고 행을 규칙으로 바꾼다', async () => {
+      mockRpc.mockResolvedValue({ data: [row], error: null });
+
+      const result = await getGroupAccessRules();
+
+      expect(mockRpc).toHaveBeenCalledWith('group_access_rules_list', {
+        p_token: 'secret-token',
+      });
+      expect(mockFrom).not.toHaveBeenCalled();
+      expect(result).toEqual([
+        {
+          id: 1,
+          programType: 'CHALLENGE',
+          programId: 42,
+          programTitle: '10월 챌린지',
+          programStartDate: '2026-10-20T01:00:00+00:00',
+          programEndDate: '2026-11-20T01:00:00+00:00',
+          planTypes: ['BASIC', 'PREMIUM'],
+          graceDays: 7,
+          memo: '이전 구매자',
+          createdAt: '2026-10-20T00:00:00+00:00',
+        },
+      ]);
+    });
+
+    it('getGroupAccessRules — plan_types·memo 가 null 이면 빈 배열·null', async () => {
+      mockRpc.mockResolvedValue({
+        data: [{ ...row, plan_types: null, memo: null }],
+        error: null,
+      });
+
+      const [rule] = await getGroupAccessRules();
+
+      expect(rule.planTypes).toEqual([]);
+      expect(rule.memo).toBeNull();
+    });
+
+    it('토큰 env 가 없으면 빈 목록이 아니라 오류를 던지고 함수를 부르지 않는다', async () => {
+      delete process.env.GROUP_ACCESS_RULES_TOKEN;
+
+      await expect(getGroupAccessRules()).rejects.toThrow(
+        'GROUP_ACCESS_RULES_TOKEN',
+      );
+      expect(mockRpc).not.toHaveBeenCalled();
+    });
+
+    it('함수가 오류(토큰 거절 42501 등)를 내면 throw 한다', async () => {
+      const error = { code: '42501', message: 'forbidden' };
+      mockRpc.mockResolvedValue({ data: null, error });
+
+      await expect(getGroupAccessRules()).rejects.toBe(error);
+    });
+
+    it('addGroupAccessRule — 등록 함수에 p_ 인자로 넘기고 저장된 행을 돌려준다', async () => {
+      mockRpc.mockResolvedValue({ data: row, error: null });
+
+      const result = await addGroupAccessRule({
+        programType: 'CHALLENGE',
+        programId: 42,
+        programTitle: '10월 챌린지',
+        programStartDate: '2026-10-20T10:00:00',
+        programEndDate: '2026-11-20T10:00:00',
+        planTypes: ['BASIC', 'PREMIUM'],
+        graceDays: 7,
+        memo: '이전 구매자',
+      });
+
+      expect(mockRpc).toHaveBeenCalledWith('group_access_rules_add', {
+        p_token: 'secret-token',
+        p_program_type: 'CHALLENGE',
+        p_program_id: 42,
+        p_program_title: '10월 챌린지',
+        p_program_start_date: '2026-10-20T10:00:00',
+        p_program_end_date: '2026-11-20T10:00:00',
+        p_plan_types: ['BASIC', 'PREMIUM'],
+        p_grace_days: 7,
+        p_memo: '이전 구매자',
+      });
+      expect(result.id).toBe(1);
+      expect(result.graceDays).toBe(7);
+    });
+
+    it('updateGroupAccessRule — 플랜·N·메모만 넘긴다', async () => {
+      mockRpc.mockResolvedValue({ data: null, error: null });
+
+      await updateGroupAccessRule(1, { planTypes: [], graceDays: 0, memo: null });
+
+      expect(mockRpc).toHaveBeenCalledWith('group_access_rules_update', {
+        p_token: 'secret-token',
+        p_id: 1,
+        p_plan_types: [],
+        p_grace_days: 0,
+        p_memo: null,
+      });
+    });
+
+    it('deleteGroupAccessRule — id 로 지운다', async () => {
+      mockRpc.mockResolvedValue({ data: null, error: null });
+
+      await deleteGroupAccessRule(3);
+
+      expect(mockRpc).toHaveBeenCalledWith('group_access_rules_delete', {
+        p_token: 'secret-token',
+        p_id: 3,
+      });
     });
   });
 });
