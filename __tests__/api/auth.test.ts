@@ -2,13 +2,8 @@ jest.mock('@/lib/kv');
 
 import { POST } from '@/app/api/auth/verify/route';
 import { NextRequest } from 'next/server';
-import {
-  isAllowedUser,
-  checkRateLimit,
-  getAccessSettings,
-  getGroupAccessRules,
-} from '@/lib/kv';
-import { AccessSettings, GroupAccessRule } from '@/lib/types';
+import { isAllowedUser, checkRateLimit, getAccessSettings } from '@/lib/kv';
+import { AccessSettings } from '@/lib/types';
 
 const mockIsAllowedUser = isAllowedUser as jest.MockedFunction<
   typeof isAllowedUser
@@ -551,209 +546,30 @@ describe('POST /api/auth/verify', () => {
     });
   });
 
+  it('응답 로그에는 원본 대신 요약(isChallenge, canWatchVod)만 남긴다', async () => {
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: { isChallenge: false, optionCodes: ['OPT-1'] },
+      }),
+    });
+
+    await POST(makeRequest({ name: '홍길동', phoneNum: '01012345678' }));
+
+    const responseLog = logSpy.mock.calls.find(
+      ([label]) => label === 'verify-challenge response:',
+    );
+    logSpy.mockRestore();
+    expect(responseLog?.[1]).toBe(
+      JSON.stringify({ isChallenge: false, canWatchVod: null }),
+    );
+  });
+
   // ─── 계정 존재 여부 비노출 ─────────────────────────────────────────
   // 이 경로는 비인증이다. 통과하지 못한 사유(가입 안 됨 / 가입했지만 이용권 없음 / 게이트
   // 상태)가 응답에서 갈리면 이름+전화번호 조합으로 가입 여부를 알아낼 수 있다.
-  describe('그룹 접근 규칙', () => {
-    const mockGetGroupAccessRules = getGroupAccessRules as jest.MockedFunction<
-      typeof getGroupAccessRules
-    >;
-
-    const RULE: GroupAccessRule = {
-      id: 1,
-      programType: 'CHALLENGE',
-      programId: 42,
-      programTitle: '10월 챌린지',
-      programStartDate: '2026-10-01T01:00:00+00:00',
-      programEndDate: '2026-10-10T13:00:00+00:00',
-      planTypes: ['BASIC'],
-      graceDays: 7,
-      memo: null,
-      createdAt: '2026-09-01T00:00:00+00:00',
-    };
-
-    const APPLICATION = {
-      programType: 'CHALLENGE',
-      programId: 42,
-      planType: 'BASIC',
-      startDate: '2026-10-01T10:00:00',
-      endDate: '2026-10-10T22:00:00',
-    };
-
-    // 2026-10-12 12:00 KST. 접근 종료는 10-17 23:59:59.999 KST = 14:59:59.999Z
-    const NOW = new Date('2026-10-12T03:00:00Z');
-    const SECONDS_TO_END = Math.floor(
-      (new Date('2026-10-17T14:59:59.999Z').getTime() - NOW.getTime()) / 1000,
-    );
-
-    function mockVerifyChallenge(data: Record<string, unknown>) {
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => ({ data }),
-      });
-    }
-
-    async function verify() {
-      const res = await POST(
-        makeRequest({ name: '홍길동', phoneNum: '01012345678' }),
-      );
-      return { body: await res.json(), cookie: res.headers.get('set-cookie') };
-    }
-
-    beforeEach(() => {
-      jest.useFakeTimers().setSystemTime(NOW);
-      mockGetGroupAccessRules.mockResolvedValue([RULE]);
-    });
-
-    afterEach(() => {
-      jest.useRealTimers();
-    });
-
-    it('챌린지 참여자가 아니어도 규칙에 맞으면 통과하고, 쿠키는 접근 종료 시각까지다', async () => {
-      mockVerifyChallenge({
-        isChallenge: false,
-        programApplications: [APPLICATION],
-      });
-
-      const { body, cookie } = await verify();
-
-      expect(body).toEqual({ isChallenge: true });
-      expect(cookie).toContain('auth_verified=1');
-      expect(cookie).toContain(`Max-Age=${SECONDS_TO_END}`);
-    });
-
-    it('게이트 ON 에서 이용권이 없어도 규칙에 맞으면 통과하고, 쿠키는 기존 상한(24시간)을 넘지 않는다', async () => {
-      mockGetAccessSettings.mockResolvedValue({
-        ...OFF_SETTINGS,
-        requireVodPass: true,
-      });
-      mockVerifyChallenge({
-        isChallenge: true,
-        canWatchVod: false,
-        programApplications: [APPLICATION],
-      });
-
-      const { body, cookie } = await verify();
-
-      expect(SECONDS_TO_END).toBeGreaterThan(86400);
-      expect(body).toEqual({ isChallenge: true });
-      expect(cookie).toContain('Max-Age=86400');
-    });
-
-    it('최상위 형태 응답({ isChallenge, programApplications })도 읽는다', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          isChallenge: false,
-          programApplications: [APPLICATION],
-        }),
-      });
-
-      const { body } = await verify();
-
-      expect(body).toEqual({ isChallenge: true });
-    });
-
-    it('규칙에 맞지 않으면 통과하지 못하고 쿠키를 내리지 않는다 (응답 본문은 같다)', async () => {
-      mockVerifyChallenge({
-        isChallenge: false,
-        programApplications: [{ ...APPLICATION, planType: 'LIGHT' }],
-      });
-
-      const { body, cookie } = await verify();
-
-      expect(body).toEqual({ isChallenge: false });
-      expect(cookie).toBeNull();
-    });
-
-    it('규칙 조회가 실패하면 막힌 결과를 그대로 둔다', async () => {
-      mockGetGroupAccessRules.mockRejectedValue(new Error('token missing'));
-      mockVerifyChallenge({
-        isChallenge: false,
-        programApplications: [APPLICATION],
-      });
-
-      const { body, cookie } = await verify();
-
-      expect(body).toEqual({ isChallenge: false });
-      expect(cookie).toBeNull();
-    });
-
-    it('기존 판정으로 통과하면 규칙을 조회하지 않고 쿠키도 1년 그대로다', async () => {
-      mockVerifyChallenge({
-        isChallenge: true,
-        programApplications: [APPLICATION],
-      });
-
-      const { body, cookie } = await verify();
-
-      expect(body).toEqual({ isChallenge: true });
-      expect(cookie).toContain('Max-Age=31536000');
-      expect(mockGetGroupAccessRules).not.toHaveBeenCalled();
-    });
-
-    it('VOD_ACCESS_SHARED_SECRET 이 있으면 verify-challenge 에 X-Vod-Access-Secret 헤더를 보낸다', async () => {
-      process.env.VOD_ACCESS_SHARED_SECRET = 'shared-secret';
-      mockVerifyChallenge({ isChallenge: false });
-
-      try {
-        await verify();
-      } finally {
-        delete process.env.VOD_ACCESS_SHARED_SECRET;
-      }
-
-      const [, init] = (global.fetch as jest.Mock).mock.calls[0];
-      expect(init.headers).toEqual({
-        'Content-Type': 'application/json; charset=utf-8',
-        'X-Vod-Access-Secret': 'shared-secret',
-      });
-    });
-
-    it('VOD_ACCESS_SHARED_SECRET 이 없으면 헤더 없이 보낸다 (기존 동작)', async () => {
-      delete process.env.VOD_ACCESS_SHARED_SECRET;
-      mockVerifyChallenge({ isChallenge: false });
-
-      await verify();
-
-      const [, init] = (global.fetch as jest.Mock).mock.calls[0];
-      expect(init.headers).toEqual({
-        'Content-Type': 'application/json; charset=utf-8',
-      });
-    });
-
-    it('응답 로그에는 원본 대신 요약(isChallenge, canWatchVod, 신청 건수)만 남긴다', async () => {
-      const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-      mockVerifyChallenge({
-        isChallenge: false,
-        programApplications: [APPLICATION],
-      });
-
-      await verify();
-
-      const responseLog = logSpy.mock.calls.find(
-        ([label]) => label === 'verify-challenge response:',
-      );
-      logSpy.mockRestore();
-      expect(responseLog?.[1]).toBe(
-        JSON.stringify({
-          isChallenge: false,
-          canWatchVod: null,
-          programApplications: 1,
-        }),
-      );
-    });
-
-    it('신청 내역이 없으면(구버전 서버) 규칙을 조회하지 않는다', async () => {
-      mockVerifyChallenge({ isChallenge: false });
-
-      await verify();
-
-      expect(mockGetGroupAccessRules).not.toHaveBeenCalled();
-    });
-  });
-
   describe('통과 실패 응답은 사유와 무관하게 동일하다', () => {
     const FAILED_CASES: Array<{
       label: string;

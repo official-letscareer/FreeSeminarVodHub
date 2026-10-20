@@ -49,7 +49,7 @@ function toProgramApplication(raw: unknown): ProgramApplication | null {
 }
 
 /**
- * 렛커 서버 응답의 `programApplications` 를 읽는다. SSO 프로필과 verify-challenge 가 공유한다.
+ * 렛커 서버 응답의 `programApplications` 를 읽는다. SSO 프로필 응답에서 쓴다.
  * 필드가 없거나 배열이 아니면(구버전 서버) 빈 배열이고, 형식이 틀린 원소는 그 원소만 버린다 —
  * 한 건이 깨졌다고 나머지 신청까지 판정에서 빠지지 않게 한다.
  */

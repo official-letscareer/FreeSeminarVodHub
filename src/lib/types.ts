@@ -71,7 +71,7 @@ export interface GroupAccessRule {
 }
 
 /**
- * 렛커 서버가 SSO 프로필·verify-challenge 응답에 내려주는 사용자의 신청 한 건.
+ * 렛커 서버가 SSO 프로필 응답에 내려주는 사용자의 신청 한 건.
  * 날짜는 오프셋 없는 KST LocalDateTime 문자열 그대로 둔다(예: 2026-10-20T10:00:00).
  */
 export interface ProgramApplication {
