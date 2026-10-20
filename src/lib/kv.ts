@@ -339,61 +339,69 @@ function toGroupAccessRule(row: Record<string, unknown>): GroupAccessRule {
   };
 }
 
-export async function getGroupAccessRules(): Promise<GroupAccessRule[]> {
-  const { data, error } = await getSupabase()
-    .from('group_access_rules')
-    .select('*')
-    .order('created_at', { ascending: false });
+// 규칙 테이블은 RLS 를 켜고 정책을 두지 않아 공개 키로는 직접 읽지도 쓰지도 못한다. 공개 키로 누구나
+// 규칙을 넣어 자기 접근을 열 수 있게 되기 때문이다. 토큰을 확인하는 함수(docs/group-access-rules.sql)로만
+// 접근한다. 토큰이 없으면 빈 목록이 아니라 오류를 던진다 — 판정 경로가 잡아 기존 판정을 유지한다.
+async function callGroupAccessRulesRpc(
+  fn:
+    | 'group_access_rules_list'
+    | 'group_access_rules_add'
+    | 'group_access_rules_update'
+    | 'group_access_rules_delete',
+  args: Record<string, unknown>,
+): Promise<unknown> {
+  const token = process.env.GROUP_ACCESS_RULES_TOKEN?.trim();
+  if (!token) {
+    throw new Error('GROUP_ACCESS_RULES_TOKEN 이 설정되지 않았습니다.');
+  }
 
+  const { data, error } = await getSupabase().rpc(fn, {
+    p_token: token,
+    ...args,
+  });
   if (error) throw error;
-  return (data ?? []).map(toGroupAccessRule);
+  return data;
+}
+
+export async function getGroupAccessRules(): Promise<GroupAccessRule[]> {
+  const data = await callGroupAccessRulesRpc('group_access_rules_list', {});
+  return Array.isArray(data)
+    ? data.map((row) => toGroupAccessRule(row as Record<string, unknown>))
+    : [];
 }
 
 export async function addGroupAccessRule(
   rule: Omit<GroupAccessRule, 'id' | 'createdAt'>,
 ): Promise<GroupAccessRule> {
-  const { data, error } = await getSupabase()
-    .from('group_access_rules')
-    .insert({
-      program_type: rule.programType,
-      program_id: rule.programId,
-      program_title: rule.programTitle,
-      program_start_date: rule.programStartDate,
-      program_end_date: rule.programEndDate,
-      plan_types: rule.planTypes,
-      grace_days: rule.graceDays,
-      memo: rule.memo,
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return toGroupAccessRule(data);
+  const data = await callGroupAccessRulesRpc('group_access_rules_add', {
+    p_program_type: rule.programType,
+    p_program_id: rule.programId,
+    p_program_title: rule.programTitle,
+    p_program_start_date: rule.programStartDate,
+    p_program_end_date: rule.programEndDate,
+    p_plan_types: rule.planTypes,
+    p_grace_days: rule.graceDays,
+    p_memo: rule.memo,
+  });
+  return toGroupAccessRule(data as Record<string, unknown>);
 }
 
-// 프로그램은 바꾸지 않는다. 다른 프로그램이면 규칙을 새로 만든다.
+// 플랜·N·메모만 바꾼다. 프로그램은 바꾸지 않는다(다른 프로그램이면 규칙을 새로 만든다).
+// 함수가 세 값을 그대로 덮어써서 셋 다 받는다 — 메모를 비우는 것(null)과 그대로 두는 것을 구분하지 않는다.
 export async function updateGroupAccessRule(
   id: number,
-  data: { planTypes?: string[]; graceDays?: number; memo?: string | null },
+  data: { planTypes: string[]; graceDays: number; memo: string | null },
 ): Promise<void> {
-  const updates: Record<string, unknown> = {};
-  if (data.planTypes !== undefined) updates.plan_types = data.planTypes;
-  if (data.graceDays !== undefined) updates.grace_days = data.graceDays;
-  if (data.memo !== undefined) updates.memo = data.memo;
-  if (Object.keys(updates).length === 0) return;
-  const { error } = await getSupabase()
-    .from('group_access_rules')
-    .update(updates)
-    .eq('id', id);
-  if (error) throw error;
+  await callGroupAccessRulesRpc('group_access_rules_update', {
+    p_id: id,
+    p_plan_types: data.planTypes,
+    p_grace_days: data.graceDays,
+    p_memo: data.memo,
+  });
 }
 
 export async function deleteGroupAccessRule(id: number): Promise<void> {
-  const { error } = await getSupabase()
-    .from('group_access_rules')
-    .delete()
-    .eq('id', id);
-  if (error) throw error;
+  await callGroupAccessRulesRpc('group_access_rules_delete', { p_id: id });
 }
 
 // ─── Banner CRUD ─────────────────────────────────────────────────────────────
