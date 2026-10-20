@@ -285,6 +285,13 @@ export default function GroupAccessRulesSection() {
             선택한 프로그램(플랜)을 신청한 사람 전체에게 프로그램 시작일부터
             종료일 + N일까지 VOD 접근을 엽니다.
           </p>
+          <p className="text-sm text-gray-500">
+            공개된 프로그램만 선택할 수 있습니다.
+          </p>
+          <p className="text-sm text-gray-500">
+            렛츠커리어 로그인(SSO) 사용자에게만 적용되며, 이름+전화번호
+            로그인에는 적용되지 않습니다.
+          </p>
 
           {/* 등록 폼 */}
           <form onSubmit={handleAdd} className="space-y-3">
