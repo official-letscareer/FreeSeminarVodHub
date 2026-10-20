@@ -4,7 +4,7 @@ const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
 // 서버 날짜는 오프셋 없는 KST LocalDateTime 이다. 오프셋을 붙이지 않고 new Date 에 넘기면
 // 실행 환경(Vercel 은 UTC)의 시간대로 읽혀 9시간이 어긋난다.
-function parseKstDateTime(value: string): Date {
+export function parseKstDateTime(value: string): Date {
   return new Date(`${value}+09:00`);
 }
 
@@ -20,7 +20,7 @@ function endOfGraceKst(endDate: string, graceDays: number): Date {
 // 오프셋 없는 LocalDateTime 만 받는다. 오프셋이 붙어 오면 +09:00 을 덧붙일 수 없어 버린다.
 const LOCAL_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?$/;
 
-function isLocalDateTime(value: unknown): value is string {
+export function isLocalDateTime(value: unknown): value is string {
   return (
     typeof value === 'string' &&
     LOCAL_DATE_TIME.test(value) &&
