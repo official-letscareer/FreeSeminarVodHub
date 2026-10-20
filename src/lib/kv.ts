@@ -2,7 +2,6 @@ import { supabase } from './supabase';
 import {
   VodItem,
   AllowedUser,
-  PremiumUser,
   Banner,
   AccessSettings,
   GroupAccessRule,
@@ -231,87 +230,6 @@ export async function isAllowedUser(
 ): Promise<boolean> {
   const { data, error } = await getSupabase()
     .from('allowed_users')
-    .select('id')
-    .eq('name', name)
-    .eq('phone_num', phoneNum)
-    .limit(1);
-
-  if (error) throw error;
-  return (data?.length ?? 0) > 0;
-}
-
-// ─── 프리미엄 멤버십 유저 CRUD ────────────────────────────────────────────────
-function toPremiumUser(row: Record<string, unknown>): PremiumUser {
-  return {
-    id: row.id as number,
-    name: row.name as string,
-    phoneNum: row.phone_num as string,
-    createdAt: row.created_at as string,
-  };
-}
-
-export async function getPremiumUsers(): Promise<PremiumUser[]> {
-  const { data, error } = await getSupabase()
-    .from('premium_users')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-  return (data ?? []).map(toPremiumUser);
-}
-
-export async function addPremiumUser(
-  name: string,
-  phoneNum: string,
-): Promise<PremiumUser> {
-  const { data, error } = await getSupabase()
-    .from('premium_users')
-    .insert({ name, phone_num: phoneNum })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return toPremiumUser(data);
-}
-
-export async function deletePremiumUser(id: number): Promise<void> {
-  const { error } = await getSupabase()
-    .from('premium_users')
-    .delete()
-    .eq('id', id);
-  if (error) throw error;
-}
-
-export async function deletePremiumUsers(ids: number[]): Promise<void> {
-  if (ids.length === 0) return;
-  const { error } = await getSupabase()
-    .from('premium_users')
-    .delete()
-    .in('id', ids);
-  if (error) throw error;
-}
-
-export async function updatePremiumUser(
-  id: number,
-  data: { name?: string; phoneNum?: string },
-): Promise<void> {
-  const updates: Record<string, unknown> = {};
-  if (data.name !== undefined) updates.name = data.name;
-  if (data.phoneNum !== undefined) updates.phone_num = data.phoneNum;
-  if (Object.keys(updates).length === 0) return;
-  const { error } = await getSupabase()
-    .from('premium_users')
-    .update(updates)
-    .eq('id', id);
-  if (error) throw error;
-}
-
-export async function isPremiumUser(
-  name: string,
-  phoneNum: string,
-): Promise<boolean> {
-  const { data, error } = await getSupabase()
-    .from('premium_users')
     .select('id')
     .eq('name', name)
     .eq('phone_num', phoneNum)

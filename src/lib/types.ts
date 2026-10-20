@@ -16,13 +16,6 @@ export interface AllowedUser {
   createdAt: string;
 }
 
-export interface PremiumUser {
-  id: number;
-  name: string;
-  phoneNum: string;
-  createdAt: string;
-}
-
 export interface Banner {
   id: number;
   imageUrl: string;
