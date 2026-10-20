@@ -5,6 +5,7 @@ import {
   PremiumUser,
   Banner,
   AccessSettings,
+  GroupAccessRule,
 } from './types';
 import type { UsageDetail, UsageEventType } from './usageLogEvents';
 import {
@@ -318,6 +319,81 @@ export async function isPremiumUser(
 
   if (error) throw error;
   return (data?.length ?? 0) > 0;
+}
+
+// ─── 그룹 접근 규칙 CRUD ─────────────────────────────────────────────────────
+function toGroupAccessRule(row: Record<string, unknown>): GroupAccessRule {
+  return {
+    id: row.id as number,
+    programType: row.program_type as GroupAccessRule['programType'],
+    programId: row.program_id as number,
+    programTitle: (row.program_title as string) ?? '',
+    programStartDate: row.program_start_date as string,
+    programEndDate: row.program_end_date as string,
+    planTypes: Array.isArray(row.plan_types)
+      ? (row.plan_types as string[])
+      : [],
+    graceDays: row.grace_days as number,
+    memo: (row.memo as string) ?? null,
+    createdAt: row.created_at as string,
+  };
+}
+
+export async function getGroupAccessRules(): Promise<GroupAccessRule[]> {
+  const { data, error } = await getSupabase()
+    .from('group_access_rules')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []).map(toGroupAccessRule);
+}
+
+export async function addGroupAccessRule(
+  rule: Omit<GroupAccessRule, 'id' | 'createdAt'>,
+): Promise<GroupAccessRule> {
+  const { data, error } = await getSupabase()
+    .from('group_access_rules')
+    .insert({
+      program_type: rule.programType,
+      program_id: rule.programId,
+      program_title: rule.programTitle,
+      program_start_date: rule.programStartDate,
+      program_end_date: rule.programEndDate,
+      plan_types: rule.planTypes,
+      grace_days: rule.graceDays,
+      memo: rule.memo,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return toGroupAccessRule(data);
+}
+
+// 프로그램은 바꾸지 않는다. 다른 프로그램이면 규칙을 새로 만든다.
+export async function updateGroupAccessRule(
+  id: number,
+  data: { planTypes?: string[]; graceDays?: number; memo?: string | null },
+): Promise<void> {
+  const updates: Record<string, unknown> = {};
+  if (data.planTypes !== undefined) updates.plan_types = data.planTypes;
+  if (data.graceDays !== undefined) updates.grace_days = data.graceDays;
+  if (data.memo !== undefined) updates.memo = data.memo;
+  if (Object.keys(updates).length === 0) return;
+  const { error } = await getSupabase()
+    .from('group_access_rules')
+    .update(updates)
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteGroupAccessRule(id: number): Promise<void> {
+  const { error } = await getSupabase()
+    .from('group_access_rules')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
 }
 
 // ─── Banner CRUD ─────────────────────────────────────────────────────────────

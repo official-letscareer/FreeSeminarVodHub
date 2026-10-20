@@ -21,6 +21,10 @@ import {
   getAccessSettings,
   updateAccessSettings,
   insertUsageLogs,
+  getGroupAccessRules,
+  addGroupAccessRule,
+  updateGroupAccessRule,
+  deleteGroupAccessRule,
 } from '@/lib/kv';
 
 const mockFrom = supabase!.from as jest.Mock;
@@ -544,6 +548,121 @@ describe('kv (Supabase)', () => {
       mockFrom.mockReturnValue(createChain({ error }));
 
       await expect(insertUsageLogs([row])).rejects.toBe(error);
+    });
+  });
+  describe('그룹 접근 규칙 CRUD', () => {
+    const row = {
+      id: 1,
+      program_type: 'CHALLENGE',
+      program_id: 42,
+      program_title: '10월 챌린지',
+      program_start_date: '2026-10-20T01:00:00+00:00',
+      program_end_date: '2026-11-20T01:00:00+00:00',
+      plan_types: ['BASIC', 'PREMIUM'],
+      grace_days: 7,
+      memo: '이전 구매자',
+      created_at: '2026-10-20T00:00:00+00:00',
+    };
+
+    it('getGroupAccessRules — snake_case 행을 규칙으로 바꿔 최신순으로 돌려준다', async () => {
+      const chain = createChain({ data: [row] });
+      mockFrom.mockReturnValue(chain);
+
+      const result = await getGroupAccessRules();
+
+      expect(mockFrom).toHaveBeenCalledWith('group_access_rules');
+      expect(chain.order).toHaveBeenCalledWith('created_at', { ascending: false });
+      expect(result).toEqual([
+        {
+          id: 1,
+          programType: 'CHALLENGE',
+          programId: 42,
+          programTitle: '10월 챌린지',
+          programStartDate: '2026-10-20T01:00:00+00:00',
+          programEndDate: '2026-11-20T01:00:00+00:00',
+          planTypes: ['BASIC', 'PREMIUM'],
+          graceDays: 7,
+          memo: '이전 구매자',
+          createdAt: '2026-10-20T00:00:00+00:00',
+        },
+      ]);
+    });
+
+    it('getGroupAccessRules — plan_types·memo 가 null 이면 빈 배열·null', async () => {
+      mockFrom.mockReturnValue(
+        createChain({ data: [{ ...row, plan_types: null, memo: null }] }),
+      );
+
+      const [rule] = await getGroupAccessRules();
+
+      expect(rule.planTypes).toEqual([]);
+      expect(rule.memo).toBeNull();
+    });
+
+    it('getGroupAccessRules — 오류가 나면 throw 한다', async () => {
+      const error = { message: 'DB error' };
+      mockFrom.mockReturnValue(createChain({ error }));
+
+      await expect(getGroupAccessRules()).rejects.toBe(error);
+    });
+
+    it('addGroupAccessRule — snake_case 컬럼으로 넣고 저장된 행을 돌려준다', async () => {
+      const chain = createChain({ data: row });
+      mockFrom.mockReturnValue(chain);
+
+      const result = await addGroupAccessRule({
+        programType: 'CHALLENGE',
+        programId: 42,
+        programTitle: '10월 챌린지',
+        programStartDate: '2026-10-20T10:00:00',
+        programEndDate: '2026-11-20T10:00:00',
+        planTypes: ['BASIC', 'PREMIUM'],
+        graceDays: 7,
+        memo: '이전 구매자',
+      });
+
+      expect(chain.insert).toHaveBeenCalledWith({
+        program_type: 'CHALLENGE',
+        program_id: 42,
+        program_title: '10월 챌린지',
+        program_start_date: '2026-10-20T10:00:00',
+        program_end_date: '2026-11-20T10:00:00',
+        plan_types: ['BASIC', 'PREMIUM'],
+        grace_days: 7,
+        memo: '이전 구매자',
+      });
+      expect(result.id).toBe(1);
+      expect(result.graceDays).toBe(7);
+    });
+
+    it('updateGroupAccessRule — 플랜·N·메모만 바꾼다', async () => {
+      const chain = createChain({});
+      mockFrom.mockReturnValue(chain);
+
+      await updateGroupAccessRule(1, { planTypes: [], graceDays: 0, memo: null });
+
+      expect(chain.update).toHaveBeenCalledWith({
+        plan_types: [],
+        grace_days: 0,
+        memo: null,
+      });
+      expect(chain.eq).toHaveBeenCalledWith('id', 1);
+    });
+
+    it('updateGroupAccessRule — 바꿀 값이 없으면 호출하지 않는다', async () => {
+      await updateGroupAccessRule(1, {});
+      expect(mockFrom).not.toHaveBeenCalled();
+    });
+
+    it('deleteGroupAccessRule — id 로 지운다', async () => {
+      const chain = createChain({});
+      mockFrom.mockReturnValue(chain);
+
+      await deleteGroupAccessRule(3);
+
+      expect(mockFrom).toHaveBeenCalledWith('group_access_rules');
+      expect(chain.delete).toHaveBeenCalled();
+      expect(chain.eq).toHaveBeenCalledWith('id', 3);
     });
   });
 });
