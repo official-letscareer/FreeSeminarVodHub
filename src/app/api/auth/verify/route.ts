@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isAllowedUser, checkRateLimit, getAccessSettings } from '@/lib/kv';
+import {
+  isAllowedUser,
+  checkRateLimit,
+  getAccessSettings,
+  getGroupAccessRules,
+} from '@/lib/kv';
 import { isEligibleForAccess } from '@/lib/accessControl';
+import {
+  findGroupAccessEndsAt,
+  parseProgramApplications,
+} from '@/lib/groupAccess';
+import type { ProgramApplication } from '@/lib/types';
 import { RATE_LIMIT } from '@/lib/constants';
 import { setUsageLogIdentityCookie } from '@/lib/usageLogIdentity';
 
@@ -100,6 +110,10 @@ export async function POST(request: NextRequest) {
   // 아래 3단계에서 설정을 읽어 게이트가 켜져 있을 때만 true 가 된다. 예외 유저는 그 단계를
   // 타지 않으므로 항상 false 다.
   let vodPassGateOn = false;
+  // 렛커 서버가 내려준 신청 내역(그룹 접근 규칙 대조용). 응답을 받지 못했거나 구버전 서버면 빈 배열.
+  let programApplications: ProgramApplication[] = [];
+  // 그룹 접근 규칙으로 통과했을 때 접근이 끝나는 시각. 쿠키 수명을 이 시각까지로 자른다.
+  let groupAccessEndsAt: Date | null = null;
 
   // 1) 예외 유저 테이블 확인
   try {
@@ -131,9 +145,17 @@ export async function POST(request: NextRequest) {
       const fullUrl = `${apiUrl}/api/v2/user/verify-challenge`;
       console.log('verify-challenge URL:', fullUrl);
       console.log('verify-challenge request:', requestBody);
+      // 서버는 공유 비밀 헤더가 맞을 때만 신청 내역(programApplications)을 채운다. 비인증 경로라
+      // 이름+전화번호만으로 남의 신청 내역을 꺼내 볼 수 없게 하기 위해서다. env 가 없으면 헤더 없이
+      // 보낸다 — 신청 내역이 빈 배열로 올 뿐 기존 판정은 그대로다.
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json; charset=utf-8',
+      };
+      const vodAccessSecret = process.env.VOD_ACCESS_SHARED_SECRET;
+      if (vodAccessSecret) headers['X-Vod-Access-Secret'] = vodAccessSecret;
       const res = await fetch(fullUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        headers,
         body: requestBody,
       });
 
@@ -151,11 +173,17 @@ export async function POST(request: NextRequest) {
         } else if (typeof data?.data?.isChallenge === 'boolean') {
           isChallenge = data.data.isChallenge;
           canWatchVod = readCanWatchVod(data.data);
+          programApplications = parseProgramApplications(
+            data.data.programApplications,
+          );
           if (Array.isArray(data?.data?.optionCodes))
             optionCodes = data.data.optionCodes;
         } else if (typeof data?.isChallenge === 'boolean') {
           isChallenge = data.isChallenge;
           canWatchVod = readCanWatchVod(data);
+          programApplications = parseProgramApplications(
+            data.programApplications,
+          );
           if (Array.isArray(data?.optionCodes)) optionCodes = data.optionCodes;
         }
       } else {
@@ -199,13 +227,38 @@ export async function POST(request: NextRequest) {
         // 통과시키는 쪽이 장애 영향이 작다고 판단해 그대로 통과시킨다.
       }
     }
+
+    // 4) 그룹 접근 규칙 — 위 판정에서 막혔을 때만 규칙을 조회한다(통과 경로에 조회를 더하지 않는다).
+    // 신청 내역이 없으면(구버전 서버·가입 안 됨) 조회하지 않는다. 조회가 실패하면 막힌 결과를 그대로
+    // 둔다 — 규칙은 기존 판정 위에 더하는 통과 경로라, 실패가 기존 결과를 바꾸지 않게 한다.
+    if (!isChallenge && programApplications.length > 0) {
+      try {
+        const rules = await getGroupAccessRules();
+        groupAccessEndsAt = findGroupAccessEndsAt(
+          programApplications,
+          rules,
+          new Date(),
+        );
+        isChallenge = groupAccessEndsAt !== null;
+      } catch (err) {
+        console.error('getGroupAccessRules error:', err);
+      }
+    }
   }
 
   const response = NextResponse.json({ isChallenge });
   if (isChallenge) {
-    const maxAge = vodPassGateOn
+    let maxAge = vodPassGateOn
       ? VOD_PASS_GATE_COOKIE_MAX_AGE
       : DEFAULT_COOKIE_MAX_AGE;
+    // 규칙으로 통과했으면 접근 종료 시각이 지나도 쿠키가 남지 않게 자른다. 이 쿠키는 접근 시점에
+    // 다시 확인하지 않기 때문이다(lib/vodAccess.ts). 기존 수명보다 길게 하지는 않는다.
+    if (groupAccessEndsAt) {
+      maxAge = Math.min(
+        maxAge,
+        Math.floor((groupAccessEndsAt.getTime() - Date.now()) / 1000),
+      );
+    }
     response.cookies.set('auth_verified', '1', {
       httpOnly: true,
       sameSite: 'lax',
