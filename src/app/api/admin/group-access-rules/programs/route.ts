@@ -10,6 +10,8 @@ function isAdminAuthorized(request: NextRequest): boolean {
   );
 }
 
+const MAX_KEYWORD_LENGTH = 50;
+
 function badGateway() {
   return NextResponse.json(
     { message: '프로그램 목록을 불러오지 못했습니다.' },
@@ -18,8 +20,9 @@ function badGateway() {
 }
 
 /**
- * 그룹 접근 규칙 등록 폼의 프로그램 드롭다운 목록. 렛커 서버의 `GET /api/v1/vod-access/programs` 를
+ * 그룹 접근 규칙 등록 폼의 프로그램 검색 목록. 렛커 서버의 `GET /api/v1/vod-access/programs` 를
  * 대신 부른다. 서버 API 는 인증 없는 공개 API 이고 공개 프로그램만 준다.
+ * keyword 가 없으면 진행 예정·진행 중, 있으면 종료 후 365일 이내까지 제목·ID 로 검색한다.
  */
 export async function GET(request: NextRequest) {
   if (!isAdminAuthorized(request)) {
@@ -37,6 +40,14 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const keyword = request.nextUrl.searchParams.get('keyword')?.trim() ?? '';
+  if (keyword.length > MAX_KEYWORD_LENGTH) {
+    return NextResponse.json(
+      { message: `검색어는 ${MAX_KEYWORD_LENGTH}자 이하여야 합니다.` },
+      { status: 400 },
+    );
+  }
+
   const apiUrl = process.env.LETSCAREER_API_URL;
   if (!apiUrl) {
     console.error('vod-access programs: LETSCAREER_API_URL 미설정');
@@ -44,10 +55,12 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const res = await fetch(
-      `${apiUrl}/api/v1/vod-access/programs?type=${type}`,
-      { cache: 'no-store' },
-    );
+    const query = keyword
+      ? `type=${type}&keyword=${encodeURIComponent(keyword)}`
+      : `type=${type}`;
+    const res = await fetch(`${apiUrl}/api/v1/vod-access/programs?${query}`, {
+      cache: 'no-store',
+    });
     if (!res.ok) {
       console.error(`vod-access programs failed: status=${res.status}`);
       return badGateway();

@@ -14,25 +14,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import ProgramSearchCombobox, {
+  type ProgramOption,
+} from '@/components/admin/ProgramSearchCombobox';
 import type { GroupAccessProgramType, GroupAccessRule } from '@/lib/types';
 
 const RULES_API = '/api/admin/group-access-rules';
 const CHALLENGE_PLAN_TYPES = ['LIGHT', 'BASIC', 'STANDARD', 'PREMIUM'];
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const SEARCH_DEBOUNCE_MS = 300;
 
 const SELECT_CLASS =
   'rounded-md border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900';
-
-/** 프로그램 목록 API 응답 한 건. 날짜는 서버가 준 오프셋 없는 KST 문자열 그대로다. */
-interface ProgramOption {
-  programId: number;
-  programType: GroupAccessProgramType;
-  title: string;
-  startDate: string;
-  endDate: string;
-  planTypes: string[];
-}
 
 class UnauthorizedError extends Error {}
 
@@ -107,12 +101,18 @@ export default function GroupAccessRulesSection() {
   // ─── 등록 폼 ───────────────────────────────────────────────────
   const [programType, setProgramType] =
     useState<GroupAccessProgramType>('CHALLENGE');
-  // 어느 종류의 목록인지 함께 들고 있어, 종류를 바꾸면 응답이 오기 전까지 로딩으로 본다.
+  // 입력 중인 검색어와, 디바운스를 거쳐 실제로 요청하는 검색어(trim)를 따로 둔다.
+  const [programQuery, setProgramQuery] = useState('');
+  const [programKeyword, setProgramKeyword] = useState('');
+  // 어느 종류·검색어의 목록인지 함께 들고 있어, 바뀌면 응답이 오기 전까지 로딩으로 본다.
   const [programList, setProgramList] = useState<{
     type: GroupAccessProgramType;
+    keyword: string;
     programs: ProgramOption[];
   } | null>(null);
-  const [programId, setProgramId] = useState<number | null>(null);
+  const [selectedProgram, setSelectedProgram] = useState<ProgramOption | null>(
+    null,
+  );
   const [planTypes, setPlanTypes] = useState<string[]>([]);
   const [graceDays, setGraceDays] = useState('0');
   const [memo, setMemo] = useState('');
@@ -154,37 +154,63 @@ export default function GroupAccessRulesSection() {
   }, [fetchRules]);
 
   useEffect(() => {
+    const timer = setTimeout(
+      () => setProgramKeyword(programQuery.trim()),
+      SEARCH_DEBOUNCE_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [programQuery]);
+
+  // 검색어·종류가 바뀌면 이전 요청은 cancelled 로 버린다. 늦게 온 응답이 새 목록을 덮지 않는다.
+  useEffect(() => {
     let cancelled = false;
+    const query = programKeyword
+      ? `type=${programType}&keyword=${encodeURIComponent(programKeyword)}`
+      : `type=${programType}`;
     requestJson<ProgramOption[]>(
-      `${RULES_API}/programs?type=${programType}`,
+      `${RULES_API}/programs?${query}`,
       undefined,
       '프로그램 목록을 불러오지 못했습니다.',
     )
       .then((programs) => {
-        if (!cancelled) setProgramList({ type: programType, programs });
+        if (!cancelled) {
+          setProgramList({
+            type: programType,
+            keyword: programKeyword,
+            programs,
+          });
+        }
       })
       .catch((err) => {
         if (cancelled) return;
-        setProgramList({ type: programType, programs: [] });
+        setProgramList({
+          type: programType,
+          keyword: programKeyword,
+          programs: [],
+        });
         handleError(err, '프로그램 목록을 불러오지 못했습니다.');
       });
     return () => {
       cancelled = true;
     };
-  }, [programType, handleError]);
+  }, [programType, programKeyword, handleError]);
 
-  const programsLoading = programList?.type !== programType;
+  // 디바운스 대기 중인 검색어도 로딩으로 본다. 이전 검색어의 결과를 고르지 않게 한다.
+  const programsLoading =
+    programList?.type !== programType ||
+    programList.keyword !== programQuery.trim();
   const programs = programsLoading ? [] : programList.programs;
-  const selectedProgram = programs.find((p) => p.programId === programId);
 
   function handleChangeProgramType(type: GroupAccessProgramType) {
     setProgramType(type);
-    setProgramId(null);
+    setProgramQuery('');
+    setProgramKeyword('');
+    setSelectedProgram(null);
     setPlanTypes([]);
   }
 
-  function handleChangeProgram(value: string) {
-    setProgramId(value ? Number(value) : null);
+  function handleSelectProgram(program: ProgramOption | null) {
+    setSelectedProgram(program);
     setPlanTypes([]);
   }
 
@@ -215,7 +241,7 @@ export default function GroupAccessRulesSection() {
         },
         '규칙 등록에 실패했습니다.',
       );
-      setProgramId(null);
+      setSelectedProgram(null);
       setPlanTypes([]);
       setGraceDays('0');
       setMemo('');
@@ -286,7 +312,8 @@ export default function GroupAccessRulesSection() {
             종료일 + N일까지 VOD 접근을 엽니다.
           </p>
           <p className="text-sm text-gray-500">
-            공개된 프로그램만 선택할 수 있습니다.
+            공개된 프로그램만 선택할 수 있습니다. 종료 후 1년 이내 프로그램은
+            검색해서 고를 수 있습니다.
           </p>
           <p className="text-sm text-gray-500">
             렛츠커리어 로그인(SSO) 사용자에게만 적용되며, 이름+전화번호
@@ -316,27 +343,16 @@ export default function GroupAccessRulesSection() {
               <label className="text-sm text-gray-600" htmlFor="gar-program">
                 프로그램
               </label>
-              <select
+              <ProgramSearchCombobox
                 id="gar-program"
-                value={programId ?? ''}
-                onChange={(e) => handleChangeProgram(e.target.value)}
-                disabled={addLoading || programsLoading}
-                className={`${SELECT_CLASS} min-w-0 flex-1`}
-              >
-                <option value="">
-                  {programsLoading
-                    ? '불러오는 중...'
-                    : programs.length === 0
-                      ? '진행 예정·진행 중인 프로그램이 없습니다'
-                      : '프로그램 선택'}
-                </option>
-                {programs.map((program) => (
-                  <option key={program.programId} value={program.programId}>
-                    {program.title} ({program.startDate.slice(0, 10)} ~{' '}
-                    {program.endDate.slice(0, 10)})
-                  </option>
-                ))}
-              </select>
+                query={programQuery}
+                onQueryChange={setProgramQuery}
+                programs={programs}
+                loading={programsLoading}
+                selected={selectedProgram}
+                onSelect={handleSelectProgram}
+                disabled={addLoading}
+              />
             </div>
 
             {programType === 'CHALLENGE' && selectedProgram ? (
