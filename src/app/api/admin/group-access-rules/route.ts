@@ -13,6 +13,9 @@ const MAX_GRACE_DAYS = 365;
 // 종료 후 이 일수 안의 프로그램까지 규칙을 만들 수 있다. 서버 프로그램 검색 범위와 같다.
 const MAX_ENDED_DAYS = 365;
 const DAY_MS = 24 * 60 * 60 * 1000;
+// 번호로 직접 등록할 때의 상한. 서버 ID 는 BIGINT 지만 JSON 숫자로 정확히 오가는 범위 안에서 자른다.
+const MAX_MANUAL_PROGRAM_ID = 10 ** 15;
+const MAX_MANUAL_TITLE_LENGTH = 100;
 
 // 접근 권한을 만드는 API 라 서명 없는 admin_verified=1 만으로는 통과하지 못한다(누구나 쿠키를 직접
 // 넣을 수 있다). usage-logs 처럼 로그인 때 발급된 서명 세션(admin_session)이 함께 있어야 한다.
@@ -101,22 +104,51 @@ export async function POST(request: NextRequest) {
   if (programType !== 'CHALLENGE' && programType !== 'LIVE') {
     return badRequest('프로그램 종류는 CHALLENGE 또는 LIVE 여야 합니다.');
   }
-  if (!Number.isInteger(programId) || (programId as number) <= 0) {
-    return badRequest('프로그램을 선택해주세요.');
-  }
   if (programTitle !== undefined && typeof programTitle !== 'string') {
     return badRequest('프로그램 제목 형식이 올바르지 않습니다.');
   }
-  const startDate = toKstDate(programStartDate);
-  const endDate = toKstDate(programEndDate);
-  if (!startDate || !endDate) {
-    return badRequest('프로그램 기간 형식이 올바르지 않습니다.');
+
+  // 날짜가 둘 다 없으면 번호로 직접 등록한 것이다. 비공개 프로그램은 검색에 나오지 않아 날짜를 모른다.
+  // 날짜는 표시용이라 판정에는 영향이 없다(docs/group-access-rules.sql).
+  const hasStartDate = programStartDate != null;
+  const hasEndDate = programEndDate != null;
+  if (hasStartDate !== hasEndDate) {
+    return badRequest('프로그램 시작일과 종료일은 함께 보내야 합니다.');
   }
-  // 규칙은 종료 후 1년 이내 프로그램까지만 만든다. 이미 만든 규칙은 그 뒤에도 남는다.
-  if (endDate.getTime() < Date.now() - MAX_ENDED_DAYS * DAY_MS) {
-    return badRequest(
-      '종료 후 1년이 지난 프로그램에는 규칙을 만들 수 없습니다.',
-    );
+
+  let programDates: { start: string; end: string } | null = null;
+  if (hasStartDate) {
+    if (!Number.isInteger(programId) || (programId as number) <= 0) {
+      return badRequest('프로그램을 선택해주세요.');
+    }
+    const startDate = toKstDate(programStartDate);
+    const endDate = toKstDate(programEndDate);
+    if (!startDate || !endDate) {
+      return badRequest('프로그램 기간 형식이 올바르지 않습니다.');
+    }
+    // 규칙은 종료 후 1년 이내 프로그램까지만 만든다. 이미 만든 규칙은 그 뒤에도 남는다.
+    if (endDate.getTime() < Date.now() - MAX_ENDED_DAYS * DAY_MS) {
+      return badRequest(
+        '종료 후 1년이 지난 프로그램에는 규칙을 만들 수 없습니다.',
+      );
+    }
+    programDates = {
+      start: startDate.toISOString(),
+      end: endDate.toISOString(),
+    };
+  } else {
+    if (
+      !Number.isInteger(programId) ||
+      (programId as number) <= 0 ||
+      (programId as number) > MAX_MANUAL_PROGRAM_ID
+    ) {
+      return badRequest('프로그램 번호는 양의 정수여야 합니다.');
+    }
+    if ((programTitle?.trim().length ?? 0) > MAX_MANUAL_TITLE_LENGTH) {
+      return badRequest(
+        `표시 이름은 ${MAX_MANUAL_TITLE_LENGTH}자 이하여야 합니다.`,
+      );
+    }
   }
   if (!isValidPlanTypes(planTypes)) {
     return badRequest('플랜 형식이 올바르지 않습니다.');
@@ -136,8 +168,8 @@ export async function POST(request: NextRequest) {
     programType,
     programId: programId as number,
     programTitle: programTitle?.trim() ?? '',
-    programStartDate: startDate.toISOString(),
-    programEndDate: endDate.toISOString(),
+    programStartDate: programDates?.start ?? null,
+    programEndDate: programDates?.end ?? null,
     planTypes,
     graceDays,
     memo: normalizeMemo(memo),
