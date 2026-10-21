@@ -409,6 +409,148 @@ describe('GroupAccessRulesSection', () => {
     );
   });
 
+  describe('번호로 직접 입력', () => {
+    function switchToManual() {
+      fireEvent.click(screen.getByLabelText('번호로 직접 입력'));
+    }
+
+    function postedBody() {
+      const [, init] = fetchMock.mock.calls.find(
+        ([, init]) => init?.method === 'POST',
+      )!;
+      return JSON.parse(init.body);
+    }
+
+    it('전환하면 검색 대신 번호·표시 이름 입력과 안내 문구, 챌린지 플랜 4개가 보인다', async () => {
+      mockApi();
+      render(<GroupAccessRulesSection />);
+      await screen.findByText('기존 챌린지');
+
+      switchToManual();
+
+      expect(screen.queryByLabelText('프로그램')).toBeNull();
+      expect(screen.getByLabelText('프로그램 번호')).toBeInTheDocument();
+      expect(screen.getByLabelText('표시 이름(선택)')).toBeInTheDocument();
+      expect(
+        screen.getByText(/번호가 맞는지는 확인하지 않습니다/),
+      ).toBeInTheDocument();
+      for (const plan of ['LIGHT', 'BASIC', 'STANDARD', 'PREMIUM']) {
+        expect(screen.getByLabelText(plan)).toBeInTheDocument();
+      }
+      expect(screen.getByRole('button', { name: '등록' })).toBeDisabled();
+    });
+
+    it('번호는 숫자만 받는다', async () => {
+      mockApi();
+      render(<GroupAccessRulesSection />);
+      switchToManual();
+
+      fireEvent.change(screen.getByLabelText('프로그램 번호'), {
+        target: { value: '12a3-' },
+      });
+
+      expect(screen.getByLabelText('프로그램 번호')).toHaveValue('123');
+    });
+
+    it('검색으로 고른 프로그램은 전환하면 비워진다', async () => {
+      mockApi();
+      render(<GroupAccessRulesSection />);
+      await selectProgram('마케팅 챌린지 3기');
+
+      switchToManual();
+      fireEvent.click(screen.getByLabelText('검색해서 선택'));
+
+      expect(screen.queryByLabelText('선택한 프로그램')).toBeNull();
+      expect(screen.getByRole('button', { name: '등록' })).toBeDisabled();
+    });
+
+    it('종류를 바꾸면 입력한 번호·플랜을 비운다', async () => {
+      mockApi();
+      render(<GroupAccessRulesSection />);
+      switchToManual();
+      fireEvent.change(screen.getByLabelText('프로그램 번호'), {
+        target: { value: '900' },
+      });
+      fireEvent.click(screen.getByLabelText('PREMIUM'));
+
+      fireEvent.change(screen.getByLabelText('종류'), {
+        target: { value: 'LIVE' },
+      });
+
+      expect(screen.getByLabelText('프로그램 번호')).toHaveValue('');
+      expect(screen.queryByLabelText('PREMIUM')).toBeNull();
+    });
+
+    it('등록하면 날짜 없이 번호·표시 이름·플랜·N·메모를 POST 한다', async () => {
+      mockApi();
+      render(<GroupAccessRulesSection />);
+      await screen.findByText('기존 챌린지');
+      switchToManual();
+
+      fireEvent.change(screen.getByLabelText('프로그램 번호'), {
+        target: { value: '900' },
+      });
+      fireEvent.change(screen.getByLabelText('표시 이름(선택)'), {
+        target: { value: '기업 챌린지' },
+      });
+      fireEvent.click(screen.getByLabelText('PREMIUM'));
+      fireEvent.change(screen.getByLabelText('종료 후 열람 일수'), {
+        target: { value: '30' },
+      });
+      fireEvent.change(screen.getByPlaceholderText('메모'), {
+        target: { value: '비공개' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: '등록' }));
+
+      await waitFor(() =>
+        expect(
+          fetchMock.mock.calls.find(([, init]) => init?.method === 'POST'),
+        ).toBeDefined(),
+      );
+      expect(postedBody()).toEqual({
+        programType: 'CHALLENGE',
+        programId: 900,
+        programTitle: '기업 챌린지',
+        planTypes: ['PREMIUM'],
+        graceDays: 30,
+        memo: '비공개',
+      });
+      // 등록이 끝나면 번호를 비운다
+      await waitFor(() =>
+        expect(screen.getByLabelText('프로그램 번호')).toHaveValue(''),
+      );
+    });
+
+    it('LIVE 는 플랜 없이 POST 한다', async () => {
+      mockApi();
+      render(<GroupAccessRulesSection />);
+      await screen.findByText('기존 챌린지');
+      fireEvent.change(screen.getByLabelText('종류'), {
+        target: { value: 'LIVE' },
+      });
+      switchToManual();
+
+      expect(screen.queryByText(/플랜 \(선택하지 않으면 전체\)/)).toBeNull();
+      fireEvent.change(screen.getByLabelText('프로그램 번호'), {
+        target: { value: '55' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: '등록' }));
+
+      await waitFor(() =>
+        expect(
+          fetchMock.mock.calls.find(([, init]) => init?.method === 'POST'),
+        ).toBeDefined(),
+      );
+      expect(postedBody()).toMatchObject({
+        programType: 'LIVE',
+        programId: 55,
+        programTitle: '',
+        planTypes: [],
+      });
+      expect(postedBody()).not.toHaveProperty('programStartDate');
+    });
+  });
+
   it('수정은 플랜·N·메모 세 값을 모두 PATCH 로 보낸다', async () => {
     mockApi({
       'PATCH /api/admin/group-access-rules': () => res(200, { success: true }),
