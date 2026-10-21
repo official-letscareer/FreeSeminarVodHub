@@ -246,8 +246,8 @@ function toGroupAccessRule(row: Record<string, unknown>): GroupAccessRule {
     programType: row.program_type as GroupAccessRule['programType'],
     programId: row.program_id as number,
     programTitle: (row.program_title as string) ?? '',
-    programStartDate: row.program_start_date as string,
-    programEndDate: row.program_end_date as string,
+    programStartDate: (row.program_start_date as string | null) ?? null,
+    programEndDate: (row.program_end_date as string | null) ?? null,
     planTypes: Array.isArray(row.plan_types)
       ? (row.plan_types as string[])
       : [],

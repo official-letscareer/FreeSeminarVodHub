@@ -5,6 +5,8 @@
 -- 판정은 VOD 허브(src/lib/groupAccess.ts)가 한다. 렛커 서버는 사용자의 신청 내역(programApplications)만 내려준다.
 --
 -- program_title, program_start_date, program_end_date 는 어드민 목록 표시용이다. 판정에는 쓰지 않는다.
+-- 번호로 직접 등록한 규칙(비공개 프로그램 등)은 날짜를 모르므로 program_start_date, program_end_date 가 NULL 이다.
+-- 이미 설치된 DB 는 docs/group-access-rules-manual-entry.sql 로 NULL 을 허용한다.
 -- 판정은 서버가 내려준 신청 내역의 날짜를 쓰므로, 프로그램 일정이 바뀌어도 판정이 따라간다.
 --
 -- grace_days 상한 365 는 서버가 신청 내역을 "종료일이 365일 이내이거나 미래인 것"만 내려주기 때문이다.
@@ -51,8 +53,9 @@ CREATE TABLE IF NOT EXISTS group_access_rules (
   program_type TEXT NOT NULL CHECK (program_type IN ('CHALLENGE', 'LIVE')),
   program_id BIGINT NOT NULL,
   program_title TEXT NOT NULL DEFAULT '',
-  program_start_date TIMESTAMPTZ NOT NULL,
-  program_end_date TIMESTAMPTZ NOT NULL,
+  -- 표시용. 번호로 직접 등록한 규칙은 NULL 이다.
+  program_start_date TIMESTAMPTZ,
+  program_end_date TIMESTAMPTZ,
   -- 비어 있으면 전체 플랜. LIVE 는 플랜이 없어 항상 빈 배열이다.
   plan_types TEXT[] NOT NULL DEFAULT '{}',
   grace_days INT NOT NULL DEFAULT 0 CHECK (grace_days BETWEEN 0 AND 365),

@@ -137,6 +137,28 @@ describe('GroupAccessRulesSection', () => {
     expect(row).toHaveTextContent('3기 수강생');
   });
 
+  it('번호로 직접 등록한 규칙은 #번호·수동, 기간은 프로그램 종료일 + N일로 보여준다', async () => {
+    mockApi({
+      'GET /api/admin/group-access-rules': () =>
+        res(200, [
+          {
+            ...RULE,
+            id: 3,
+            programId: 77,
+            programTitle: '',
+            programStartDate: null,
+            programEndDate: null,
+            graceDays: 30,
+          },
+        ]),
+    });
+    render(<GroupAccessRulesSection />);
+
+    const row = (await screen.findByText('#77')).closest('tr')!;
+    expect(row).toHaveTextContent('수동');
+    expect(row).toHaveTextContent('프로그램 종료일 + 30일');
+  });
+
   it('챌린지 프로그램을 고르면 그 프로그램의 플랜만 고를 수 있다', async () => {
     mockApi();
     render(<GroupAccessRulesSection />);

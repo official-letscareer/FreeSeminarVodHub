@@ -612,6 +612,54 @@ describe('kv (Supabase)', () => {
       expect(rule.memo).toBeNull();
     });
 
+    it('getGroupAccessRules — 번호로 직접 등록한 규칙은 날짜가 null 그대로다', async () => {
+      mockRpc.mockResolvedValue({
+        data: [
+          {
+            ...row,
+            program_title: '',
+            program_start_date: null,
+            program_end_date: null,
+          },
+        ],
+        error: null,
+      });
+
+      const [rule] = await getGroupAccessRules();
+
+      expect(rule.programTitle).toBe('');
+      expect(rule.programStartDate).toBeNull();
+      expect(rule.programEndDate).toBeNull();
+    });
+
+    it('addGroupAccessRule — 날짜가 null 이면 p_ 인자에도 null 로 넘긴다', async () => {
+      mockRpc.mockResolvedValue({
+        data: { ...row, program_start_date: null, program_end_date: null },
+        error: null,
+      });
+
+      const result = await addGroupAccessRule({
+        programType: 'CHALLENGE',
+        programId: 42,
+        programTitle: '',
+        programStartDate: null,
+        programEndDate: null,
+        planTypes: [],
+        graceDays: 7,
+        memo: null,
+      });
+
+      expect(mockRpc).toHaveBeenCalledWith(
+        'group_access_rules_add',
+        expect.objectContaining({
+          p_program_start_date: null,
+          p_program_end_date: null,
+        }),
+      );
+      expect(result.programStartDate).toBeNull();
+      expect(result.programEndDate).toBeNull();
+    });
+
     it('토큰 env 가 없으면 빈 목록이 아니라 오류를 던지고 함수를 부르지 않는다', async () => {
       delete process.env.GROUP_ACCESS_RULES_TOKEN;
 
