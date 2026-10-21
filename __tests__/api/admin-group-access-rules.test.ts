@@ -259,6 +259,115 @@ describe('POST /api/admin/group-access-rules', () => {
   });
 });
 
+describe('POST /api/admin/group-access-rules — 번호로 직접 등록', () => {
+  const MANUAL_POST = {
+    programType: 'CHALLENGE',
+    programId: 900,
+    planTypes: ['PREMIUM'],
+    graceDays: 30,
+    memo: '비공개 기업 챌린지',
+  };
+
+  it('날짜 없이 번호만으로 등록하고, 날짜는 null·제목은 빈 문자열로 넣는다', async () => {
+    mockAddRule.mockResolvedValue({
+      ...RULE,
+      programStartDate: null,
+      programEndDate: null,
+    });
+
+    const res = await POST(makeReq('POST', BASE_URL, MANUAL_POST));
+
+    expect(res.status).toBe(201);
+    expect(mockAddRule).toHaveBeenCalledWith({
+      programType: 'CHALLENGE',
+      programId: 900,
+      programTitle: '',
+      programStartDate: null,
+      programEndDate: null,
+      planTypes: ['PREMIUM'],
+      graceDays: 30,
+      memo: '비공개 기업 챌린지',
+    });
+  });
+
+  it('날짜를 null 로 보내도 수동 등록이고, 제목은 trim 해 넣는다', async () => {
+    mockAddRule.mockResolvedValue(RULE);
+
+    const res = await POST(
+      makeReq('POST', BASE_URL, {
+        ...MANUAL_POST,
+        programTitle: ' 기업 챌린지 ',
+        programStartDate: null,
+        programEndDate: null,
+      }),
+    );
+
+    expect(res.status).toBe(201);
+    expect(mockAddRule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        programTitle: '기업 챌린지',
+        programStartDate: null,
+        programEndDate: null,
+      }),
+    );
+  });
+
+  it('제목 100자는 허용한다', async () => {
+    mockAddRule.mockResolvedValue(RULE);
+    const res = await POST(
+      makeReq('POST', BASE_URL, {
+        ...MANUAL_POST,
+        programTitle: 'a'.repeat(100),
+      }),
+    );
+    expect(res.status).toBe(201);
+  });
+
+  it.each([
+    ['번호 0', { programId: 0 }],
+    ['번호 음수', { programId: -1 }],
+    ['번호 소수', { programId: 1.5 }],
+    ['번호 문자열', { programId: '900' }],
+    ['번호 상한 초과', { programId: 10 ** 15 + 1 }],
+    ['제목 100자 초과', { programTitle: 'a'.repeat(101) }],
+    ['제목이 문자열이 아님', { programTitle: 3 }],
+    ['LIVE 인데 플랜이 있음', { programType: 'LIVE', planTypes: ['BASIC'] }],
+    ['grace_days 365 초과', { graceDays: 366 }],
+    ['시작일만 있음', { programStartDate: '2026-10-20T10:00:00' }],
+    ['종료일만 있음', { programEndDate: '2026-11-20T22:00:00' }],
+    [
+      '시작일만 있고 종료일은 null',
+      { programStartDate: '2026-10-20T10:00:00', programEndDate: null },
+    ],
+  ])('%s → 400 이고 저장하지 않는다', async (_label, overrides) => {
+    const res = await POST(
+      makeReq('POST', BASE_URL, { ...MANUAL_POST, ...overrides }),
+    );
+    expect(res.status).toBe(400);
+    expect(mockAddRule).not.toHaveBeenCalled();
+  });
+
+  it('날짜가 하나만 있으면 함께 보내라는 문구다', async () => {
+    const res = await POST(
+      makeReq('POST', BASE_URL, {
+        ...MANUAL_POST,
+        programEndDate: '2026-11-20T22:00:00',
+      }),
+    );
+    expect((await res.json()).message).toBe(
+      '프로그램 시작일과 종료일은 함께 보내야 합니다.',
+    );
+  });
+
+  it('번호 상한(10^15)은 허용한다', async () => {
+    mockAddRule.mockResolvedValue(RULE);
+    const res = await POST(
+      makeReq('POST', BASE_URL, { ...MANUAL_POST, programId: 10 ** 15 }),
+    );
+    expect(res.status).toBe(201);
+  });
+});
+
 describe('PATCH /api/admin/group-access-rules', () => {
   beforeEach(() => {
     mockGetRules.mockResolvedValue([RULE, LIVE_RULE]);

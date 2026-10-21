@@ -17,6 +17,7 @@ import {
 import ProgramSearchCombobox, {
   type ProgramOption,
 } from '@/components/admin/ProgramSearchCombobox';
+import ManualProgramFields from '@/components/admin/ManualProgramFields';
 import type { GroupAccessProgramType, GroupAccessRule } from '@/lib/types';
 
 const RULES_API = '/api/admin/group-access-rules';
@@ -27,6 +28,14 @@ const SEARCH_DEBOUNCE_MS = 300;
 
 const SELECT_CLASS =
   'rounded-md border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900';
+
+// 검색해서 고르거나, 검색에 안 나오는 프로그램(비공개 등)은 번호로 직접 입력한다.
+type EntryMode = 'search' | 'manual';
+
+const ENTRY_MODES: { value: EntryMode; label: string }[] = [
+  { value: 'search', label: '검색해서 선택' },
+  { value: 'manual', label: '번호로 직접 입력' },
+];
 
 class UnauthorizedError extends Error {}
 
@@ -47,6 +56,15 @@ function formatKstDate(iso: string, plusDays = 0): string {
   return new Date(new Date(iso).getTime() + KST_OFFSET_MS + plusDays * DAY_MS)
     .toISOString()
     .slice(0, 10);
+}
+
+// 번호로 직접 등록한 규칙은 날짜가 없고(null), 제목도 비어 있을 수 있다.
+function isManualRule(rule: GroupAccessRule): boolean {
+  return rule.programStartDate === null || rule.programEndDate === null;
+}
+
+function ruleDisplayTitle(rule: GroupAccessRule): string {
+  return rule.programTitle || `#${rule.programId}`;
 }
 
 function formatPlans(planTypes: string[]): string {
@@ -101,6 +119,9 @@ export default function GroupAccessRulesSection() {
   // ─── 등록 폼 ───────────────────────────────────────────────────
   const [programType, setProgramType] =
     useState<GroupAccessProgramType>('CHALLENGE');
+  const [entryMode, setEntryMode] = useState<EntryMode>('search');
+  const [manualProgramId, setManualProgramId] = useState('');
+  const [manualTitle, setManualTitle] = useState('');
   // 입력 중인 검색어와, 디바운스를 거쳐 실제로 요청하는 검색어(trim)를 따로 둔다.
   const [programQuery, setProgramQuery] = useState('');
   const [programKeyword, setProgramKeyword] = useState('');
@@ -200,13 +221,30 @@ export default function GroupAccessRulesSection() {
     programList?.type !== programType ||
     programList.keyword !== programQuery.trim();
   const programs = programsLoading ? [] : programList.programs;
+  // 수동 입력은 프로그램의 플랜을 몰라 챌린지 플랜 4개를 모두 보여준다.
+  const planOptions =
+    entryMode === 'manual'
+      ? CHALLENGE_PLAN_TYPES
+      : (selectedProgram?.planTypes ?? null);
 
-  function handleChangeProgramType(type: GroupAccessProgramType) {
-    setProgramType(type);
+  // 고른 프로그램·입력한 번호·플랜을 비운다. N·메모는 그대로 둔다.
+  function resetProgramSelection() {
     setProgramQuery('');
     setProgramKeyword('');
     setSelectedProgram(null);
+    setManualProgramId('');
+    setManualTitle('');
     setPlanTypes([]);
+  }
+
+  function handleChangeProgramType(type: GroupAccessProgramType) {
+    setProgramType(type);
+    resetProgramSelection();
+  }
+
+  function handleChangeEntryMode(mode: EntryMode) {
+    setEntryMode(mode);
+    resetProgramSelection();
   }
 
   function handleSelectProgram(program: ProgramOption | null) {
@@ -214,10 +252,32 @@ export default function GroupAccessRulesSection() {
     setPlanTypes([]);
   }
 
+  // 수동 입력은 날짜를 보내지 않는다. 서버는 날짜가 없으면 번호로 직접 등록한 규칙으로 본다.
+  function buildProgramFields() {
+    if (entryMode === 'manual') {
+      return manualProgramId
+        ? { programId: Number(manualProgramId), programTitle: manualTitle }
+        : null;
+    }
+    return selectedProgram
+      ? {
+          programId: selectedProgram.programId,
+          programTitle: selectedProgram.title,
+          programStartDate: selectedProgram.startDate,
+          programEndDate: selectedProgram.endDate,
+        }
+      : null;
+  }
+
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedProgram) {
-      setError('프로그램을 선택해주세요.');
+    const programFields = buildProgramFields();
+    if (!programFields) {
+      setError(
+        entryMode === 'manual'
+          ? '프로그램 번호를 입력해주세요.'
+          : '프로그램을 선택해주세요.',
+      );
       return;
     }
     setError('');
@@ -230,10 +290,7 @@ export default function GroupAccessRulesSection() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             programType,
-            programId: selectedProgram.programId,
-            programTitle: selectedProgram.title,
-            programStartDate: selectedProgram.startDate,
-            programEndDate: selectedProgram.endDate,
+            ...programFields,
             planTypes: programType === 'CHALLENGE' ? planTypes : [],
             graceDays: Number(graceDays),
             memo,
@@ -241,8 +298,7 @@ export default function GroupAccessRulesSection() {
         },
         '규칙 등록에 실패했습니다.',
       );
-      setSelectedProgram(null);
-      setPlanTypes([]);
+      resetProgramSelection();
       setGraceDays('0');
       setMemo('');
       await fetchRules();
@@ -312,8 +368,8 @@ export default function GroupAccessRulesSection() {
             종료일 + N일까지 VOD 접근을 엽니다.
           </p>
           <p className="text-sm text-gray-500">
-            공개된 프로그램만 선택할 수 있습니다. 종료 후 1년 이내 프로그램은
-            검색해서 고를 수 있습니다.
+            검색으로는 공개된 프로그램만 선택할 수 있습니다. 종료 후 1년 이내
+            프로그램은 검색해서 고를 수 있습니다.
           </p>
           <p className="text-sm text-gray-500">
             렛츠커리어 로그인(SSO) 사용자에게만 적용되며, 이름+전화번호
@@ -340,28 +396,63 @@ export default function GroupAccessRulesSection() {
                 <option value="CHALLENGE">챌린지</option>
                 <option value="LIVE">라이브</option>
               </select>
-              <label className="text-sm text-gray-600" htmlFor="gar-program">
-                프로그램
-              </label>
-              <ProgramSearchCombobox
-                id="gar-program"
-                query={programQuery}
-                onQueryChange={setProgramQuery}
-                programs={programs}
-                loading={programsLoading}
-                selected={selectedProgram}
-                onSelect={handleSelectProgram}
-                disabled={addLoading}
-              />
+              <div
+                role="radiogroup"
+                aria-label="프로그램 선택 방식"
+                className="flex gap-3"
+              >
+                {ENTRY_MODES.map((mode) => (
+                  <label
+                    key={mode.value}
+                    className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer"
+                  >
+                    <input
+                      type="radio"
+                      name="gar-entry-mode"
+                      value={mode.value}
+                      checked={entryMode === mode.value}
+                      onChange={() => handleChangeEntryMode(mode.value)}
+                      disabled={addLoading}
+                    />
+                    {mode.label}
+                  </label>
+                ))}
+              </div>
             </div>
 
-            {programType === 'CHALLENGE' && selectedProgram ? (
+            {entryMode === 'search' ? (
+              <div className="flex gap-3 items-center flex-wrap">
+                <label className="text-sm text-gray-600" htmlFor="gar-program">
+                  프로그램
+                </label>
+                <ProgramSearchCombobox
+                  id="gar-program"
+                  query={programQuery}
+                  onQueryChange={setProgramQuery}
+                  programs={programs}
+                  loading={programsLoading}
+                  selected={selectedProgram}
+                  onSelect={handleSelectProgram}
+                  disabled={addLoading}
+                />
+              </div>
+            ) : (
+              <ManualProgramFields
+                programId={manualProgramId}
+                onProgramIdChange={setManualProgramId}
+                title={manualTitle}
+                onTitleChange={setManualTitle}
+                disabled={addLoading}
+              />
+            )}
+
+            {programType === 'CHALLENGE' && planOptions ? (
               <div className="space-y-1">
                 <p className="text-sm text-gray-600">
                   플랜 (선택하지 않으면 전체)
                 </p>
                 <PlanCheckboxes
-                  options={selectedProgram.planTypes}
+                  options={planOptions}
                   selected={planTypes}
                   onToggle={(plan) =>
                     setPlanTypes((prev) => togglePlan(prev, plan))
@@ -398,7 +489,10 @@ export default function GroupAccessRulesSection() {
               />
               <Button
                 type="submit"
-                disabled={addLoading || !selectedProgram}
+                disabled={
+                  addLoading ||
+                  (entryMode === 'manual' ? !manualProgramId : !selectedProgram)
+                }
                 className="shrink-0"
               >
                 {addLoading ? '등록 중...' : '등록'}
@@ -462,11 +556,14 @@ export default function GroupAccessRulesSection() {
                         className="border-b border-gray-100 hover:bg-gray-50 transition-colors align-top"
                       >
                         <td className="p-2">
-                          <p className="font-medium">{rule.programTitle}</p>
+                          <p className="font-medium">
+                            {ruleDisplayTitle(rule)}
+                          </p>
                           <p className="text-xs text-gray-400">
                             {rule.programType === 'CHALLENGE'
                               ? '챌린지'
                               : '라이브'}
+                            {isManualRule(rule) ? ' · 수동' : null}
                           </p>
                         </td>
                         <td className="p-2 text-gray-600">
@@ -485,8 +582,18 @@ export default function GroupAccessRulesSection() {
                           )}
                         </td>
                         <td className="p-2 text-gray-600 whitespace-nowrap">
-                          {formatKstDate(rule.programStartDate)} ~{' '}
-                          {formatKstDate(rule.programEndDate, graceForDisplay)}
+                          {rule.programStartDate === null ||
+                          rule.programEndDate === null ? (
+                            `프로그램 종료일 + ${graceForDisplay}일`
+                          ) : (
+                            <>
+                              {formatKstDate(rule.programStartDate)} ~{' '}
+                              {formatKstDate(
+                                rule.programEndDate,
+                                graceForDisplay,
+                              )}
+                            </>
+                          )}
                           {editing ? (
                             <Input
                               aria-label="종료 후 열람 일수"
@@ -571,7 +678,8 @@ export default function GroupAccessRulesSection() {
           <DialogHeader>
             <DialogTitle>그룹 접근 규칙 삭제</DialogTitle>
             <DialogDescription>
-              &quot;{deleteTarget?.programTitle}&quot; 규칙을 삭제하시겠습니까?
+              &quot;{deleteTarget ? ruleDisplayTitle(deleteTarget) : ''}&quot;
+              규칙을 삭제하시겠습니까?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
