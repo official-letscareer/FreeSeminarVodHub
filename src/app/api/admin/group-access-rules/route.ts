@@ -10,6 +10,9 @@ import { ADMIN_SESSION_COOKIE, verifyAdminSession } from '@/lib/adminSession';
 
 const CHALLENGE_PLAN_TYPES = ['LIGHT', 'BASIC', 'STANDARD', 'PREMIUM'];
 const MAX_GRACE_DAYS = 365;
+// 종료 후 이 일수 안의 프로그램까지 규칙을 만들 수 있다. 서버 프로그램 검색 범위와 같다.
+const MAX_ENDED_DAYS = 365;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 // 접근 권한을 만드는 API 라 서명 없는 admin_verified=1 만으로는 통과하지 못한다(누구나 쿠키를 직접
 // 넣을 수 있다). usage-logs 처럼 로그인 때 발급된 서명 세션(admin_session)이 함께 있어야 한다.
@@ -109,9 +112,11 @@ export async function POST(request: NextRequest) {
   if (!startDate || !endDate) {
     return badRequest('프로그램 기간 형식이 올바르지 않습니다.');
   }
-  // 규칙은 진행 예정·진행 중인 프로그램에만 만든다. 이미 만든 규칙은 끝난 뒤에도 남는다.
-  if (endDate.getTime() < Date.now()) {
-    return badRequest('이미 끝난 프로그램에는 규칙을 만들 수 없습니다.');
+  // 규칙은 종료 후 1년 이내 프로그램까지만 만든다. 이미 만든 규칙은 그 뒤에도 남는다.
+  if (endDate.getTime() < Date.now() - MAX_ENDED_DAYS * DAY_MS) {
+    return badRequest(
+      '종료 후 1년이 지난 프로그램에는 규칙을 만들 수 없습니다.',
+    );
   }
   if (!isValidPlanTypes(planTypes)) {
     return badRequest('플랜 형식이 올바르지 않습니다.');

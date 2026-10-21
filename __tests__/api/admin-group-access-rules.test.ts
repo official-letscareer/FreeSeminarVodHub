@@ -193,7 +193,8 @@ describe('POST /api/admin/group-access-rules', () => {
     ['grace_days 음수', { graceDays: -1 }],
     ['grace_days 365 초과', { graceDays: 366 }],
     ['grace_days 소수', { graceDays: 1.5 }],
-    ['종료일이 지남', { programEndDate: '2026-10-12T11:59:59' }],
+    // 지금(2026-10-12 12:00 KST) - 365일 = 2025-10-12 12:00 KST 보다 1초 전
+    ['종료 후 365일이 지남', { programEndDate: '2025-10-12T11:59:59' }],
     ['종료일에 오프셋이 붙음', { programEndDate: '2026-11-20T22:00:00+09:00' }],
     ['시작일 형식 오류', { programStartDate: '2026-10-20' }],
     ['메모가 문자열이 아님', { memo: 3 }],
@@ -203,6 +204,36 @@ describe('POST /api/admin/group-access-rules', () => {
     );
     expect(res.status).toBe(400);
     expect(mockAddRule).not.toHaveBeenCalled();
+  });
+
+  it('종료 후 365일 이내(경계 포함) 프로그램은 등록된다', async () => {
+    mockAddRule.mockResolvedValue(RULE);
+    for (const programEndDate of [
+      '2026-10-12T11:59:59',
+      '2025-10-12T12:00:00',
+    ]) {
+      const res = await POST(
+        makeReq('POST', BASE_URL, {
+          ...VALID_POST,
+          programStartDate: '2025-09-01T10:00:00',
+          programEndDate,
+        }),
+      );
+      expect(res.status).toBe(201);
+    }
+  });
+
+  it('종료 후 365일이 지나면 400 문구가 1년 기준이다', async () => {
+    const res = await POST(
+      makeReq('POST', BASE_URL, {
+        ...VALID_POST,
+        programEndDate: '2025-10-12T11:59:59',
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).message).toBe(
+      '종료 후 1년이 지난 프로그램에는 규칙을 만들 수 없습니다.',
+    );
   });
 
   it('grace_days 0 과 365 는 허용한다', async () => {
@@ -298,8 +329,15 @@ describe('GET /api/admin/group-access-rules/programs', () => {
     },
   ];
 
-  function programsReq(type = 'CHALLENGE') {
-    return makeReq('GET', `${BASE_URL}/programs?type=${type}`);
+  function programsReq(type = 'CHALLENGE', extraQuery = '') {
+    return makeReq('GET', `${BASE_URL}/programs?type=${type}${extraQuery}`);
+  }
+
+  function mockPrograms() {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { programs: PROGRAMS } }),
+    });
   }
 
   let errorSpy: jest.SpyInstance;
@@ -332,6 +370,62 @@ describe('GET /api/admin/group-access-rules/programs', () => {
       'https://api.example.com/api/v1/vod-access/programs?type=LIVE',
       { cache: 'no-store' },
     );
+  });
+
+  it('keyword 는 trim 해서 인코딩해 넘긴다', async () => {
+    mockPrograms();
+
+    const res = await programsGet(
+      programsReq(
+        'CHALLENGE',
+        `&keyword=${encodeURIComponent('  마케팅 & 3기 ')}`,
+      ),
+    );
+
+    expect(res.status).toBe(200);
+    expect(global.fetch).toHaveBeenCalledWith(
+      `https://api.example.com/api/v1/vod-access/programs?type=CHALLENGE&keyword=${encodeURIComponent('마케팅 & 3기')}`,
+      { cache: 'no-store' },
+    );
+  });
+
+  it('keyword 가 공백뿐이면 keyword 없이 부른다', async () => {
+    mockPrograms();
+
+    await programsGet(programsReq('CHALLENGE', '&keyword=%20%20'));
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://api.example.com/api/v1/vod-access/programs?type=CHALLENGE',
+      { cache: 'no-store' },
+    );
+  });
+
+  it('keyword 가 50자면 넘기고, 51자면 400 이고 서버를 부르지 않는다', async () => {
+    mockPrograms();
+    const ok = await programsGet(
+      programsReq('CHALLENGE', `&keyword=${'가'.repeat(50)}`),
+    );
+    expect(ok.status).toBe(200);
+
+    (global.fetch as jest.Mock).mockClear();
+    const res = await programsGet(
+      programsReq('CHALLENGE', `&keyword=${'가'.repeat(51)}`),
+    );
+    expect(res.status).toBe(400);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('미인증이면 keyword 가 있어도 401 이고 서버를 부르지 않는다', async () => {
+    const res = await programsGet(
+      makeReq(
+        'GET',
+        `${BASE_URL}/programs?type=CHALLENGE&keyword=a`,
+        undefined,
+        false,
+      ),
+    );
+    expect(res.status).toBe(401);
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it('type 이 CHALLENGE|LIVE 가 아니면 400 이고 서버를 부르지 않는다', async () => {
