@@ -55,14 +55,15 @@ export type GroupAccessProgramType = 'CHALLENGE' | 'LIVE';
 /**
  * 그룹 접근 규칙. 이 프로그램(플랜)을 신청한 사람 전체에게 종료일 + graceDays 일까지 VOD 접근을 연다.
  * programTitle·programStartDate·programEndDate 는 어드민 표시용이고, 판정에는 신청 내역의 날짜를 쓴다.
+ * 번호로 직접 등록한 규칙은 날짜를 모르므로 programStartDate·programEndDate 가 null 이다.
  */
 export interface GroupAccessRule {
   id: number;
   programType: GroupAccessProgramType;
   programId: number;
   programTitle: string;
-  programStartDate: string;
-  programEndDate: string;
+  programStartDate: string | null;
+  programEndDate: string | null;
   /** 비어 있으면 전체 플랜. */
   planTypes: string[];
   graceDays: number;

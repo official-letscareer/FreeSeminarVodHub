@@ -44,6 +44,20 @@ describe('findGroupAccessEndsAt', () => {
     expect(result).toEqual(GRACE_END);
   });
 
+  it('규칙의 표시용 날짜가 null(번호로 직접 등록)이어도 신청의 날짜로 판정한다', () => {
+    const manual = rule({ programStartDate: null, programEndDate: null });
+    expect(findGroupAccessEndsAt([application()], [manual], DURING)).toEqual(
+      GRACE_END,
+    );
+    expect(
+      findGroupAccessEndsAt(
+        [application()],
+        [manual],
+        new Date(GRACE_END.getTime() + 1),
+      ),
+    ).toBeNull();
+  });
+
   it('플랜이 규칙에 없으면 null', () => {
     const result = findGroupAccessEndsAt(
       [application({ planType: 'LIGHT' })],

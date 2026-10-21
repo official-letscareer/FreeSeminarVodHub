@@ -49,6 +49,15 @@ function formatKstDate(iso: string, plusDays = 0): string {
     .slice(0, 10);
 }
 
+// 번호로 직접 등록한 규칙은 날짜가 없고(null), 제목도 비어 있을 수 있다.
+function isManualRule(rule: GroupAccessRule): boolean {
+  return rule.programStartDate === null || rule.programEndDate === null;
+}
+
+function ruleDisplayTitle(rule: GroupAccessRule): string {
+  return rule.programTitle || `#${rule.programId}`;
+}
+
 function formatPlans(planTypes: string[]): string {
   return planTypes.length === 0 ? '전체' : planTypes.join(', ');
 }
@@ -462,11 +471,14 @@ export default function GroupAccessRulesSection() {
                         className="border-b border-gray-100 hover:bg-gray-50 transition-colors align-top"
                       >
                         <td className="p-2">
-                          <p className="font-medium">{rule.programTitle}</p>
+                          <p className="font-medium">
+                            {ruleDisplayTitle(rule)}
+                          </p>
                           <p className="text-xs text-gray-400">
                             {rule.programType === 'CHALLENGE'
                               ? '챌린지'
                               : '라이브'}
+                            {isManualRule(rule) ? ' · 수동' : null}
                           </p>
                         </td>
                         <td className="p-2 text-gray-600">
@@ -485,8 +497,18 @@ export default function GroupAccessRulesSection() {
                           )}
                         </td>
                         <td className="p-2 text-gray-600 whitespace-nowrap">
-                          {formatKstDate(rule.programStartDate)} ~{' '}
-                          {formatKstDate(rule.programEndDate, graceForDisplay)}
+                          {rule.programStartDate === null ||
+                          rule.programEndDate === null ? (
+                            `프로그램 종료일 + ${graceForDisplay}일`
+                          ) : (
+                            <>
+                              {formatKstDate(rule.programStartDate)} ~{' '}
+                              {formatKstDate(
+                                rule.programEndDate,
+                                graceForDisplay,
+                              )}
+                            </>
+                          )}
                           {editing ? (
                             <Input
                               aria-label="종료 후 열람 일수"
@@ -571,7 +593,8 @@ export default function GroupAccessRulesSection() {
           <DialogHeader>
             <DialogTitle>그룹 접근 규칙 삭제</DialogTitle>
             <DialogDescription>
-              &quot;{deleteTarget?.programTitle}&quot; 규칙을 삭제하시겠습니까?
+              &quot;{deleteTarget ? ruleDisplayTitle(deleteTarget) : ''}&quot;
+              규칙을 삭제하시겠습니까?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
