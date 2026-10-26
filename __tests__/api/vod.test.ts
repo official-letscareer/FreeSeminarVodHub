@@ -111,6 +111,7 @@ describe('GET /api/vod', () => {
         optionCodes: [],
         canWatchVod: null,
         programApplications: [],
+        userId: null,
       });
       mockGetEnabledVodList.mockResolvedValue(mockList);
 
@@ -149,6 +150,7 @@ describe('GET /api/vod', () => {
         optionCodes: [],
         canWatchVod: null,
         programApplications: [],
+        userId: null,
       });
       mockGetAccessSettings.mockResolvedValue(OFF_SETTINGS);
       mockGetEnabledVodList.mockResolvedValue(mockList);
@@ -165,6 +167,7 @@ describe('GET /api/vod', () => {
         optionCodes: [],
         canWatchVod: null,
         programApplications: [],
+        userId: null,
       });
       mockGetAccessSettings.mockResolvedValue({
         requireChallengeParticipation: true,
@@ -187,6 +190,7 @@ describe('GET /api/vod', () => {
         optionCodes: ['PLUS1'],
         canWatchVod: null,
         programApplications: [],
+        userId: null,
       });
       mockGetAccessSettings.mockResolvedValue({
         requireChallengeParticipation: false,
@@ -207,6 +211,7 @@ describe('GET /api/vod', () => {
         optionCodes: ['WFB1'],
         canWatchVod: null,
         programApplications: [],
+        userId: null,
       });
       mockGetAccessSettings.mockResolvedValue({
         requireChallengeParticipation: false,
@@ -247,6 +252,7 @@ describe('GET /api/vod', () => {
         optionCodes: [],
         canWatchVod: false,
         programApplications: [],
+        userId: null,
       });
 
       const res = await vodListGet(makeSsoReq('http://localhost/api/vod'));
@@ -302,6 +308,7 @@ describe('GET /api/vod — 그룹 접근 규칙', () => {
           endDate: '2026-10-10T22:00:00',
         },
       ],
+      userId: null,
     };
   }
 
@@ -443,6 +450,7 @@ describe('GET /api/vod/[id]', () => {
         optionCodes: [],
         canWatchVod: null,
         programApplications: [],
+        userId: null,
       });
       mockGetVodList.mockResolvedValue(mockList);
 
@@ -471,6 +479,7 @@ describe('GET /api/vod/[id]', () => {
         optionCodes: [],
         canWatchVod: null,
         programApplications: [],
+        userId: null,
       });
       mockGetAccessSettings.mockResolvedValue({
         requireChallengeParticipation: true,
@@ -503,6 +512,7 @@ describe('GET /api/vod/[id]', () => {
         optionCodes: [],
         canWatchVod: false,
         programApplications: [],
+        userId: null,
       });
 
       const res = await vodDetailGet(makeSsoReq('http://localhost/api/vod/1'), {

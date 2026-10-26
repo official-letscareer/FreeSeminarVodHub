@@ -100,6 +100,10 @@ export interface SsoUserProfile {
    * 서버) 빈 배열이라 규칙이 아무도 통과시키지 않을 뿐 기존 판정은 그대로다.
    */
   programApplications: ProgramApplication[];
+  /**
+   * 렛츠커리어 사용자 번호. 재생 기록(LC-3507)의 키다. 응답에 없으면(구버전 서버) null 이고 기록하지 않는다.
+   */
+  userId: number | null;
 }
 
 /**
@@ -138,6 +142,10 @@ export async function getSsoUserProfile(
       canWatchVod:
         typeof data.canWatchVod === 'boolean' ? data.canWatchVod : null,
       programApplications: parseProgramApplications(data.programApplications),
+      userId:
+        Number.isSafeInteger(data.userId) && data.userId > 0
+          ? data.userId
+          : null,
     };
   } catch {
     return null;

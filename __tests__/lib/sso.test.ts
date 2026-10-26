@@ -42,6 +42,7 @@ describe('getSsoUserProfile', () => {
       optionCodes: ['WFB1', 'LFB2'],
       canWatchVod: null,
       programApplications: [],
+      userId: null,
     });
     expect(global.fetch).toHaveBeenCalledWith(
       'https://api.example.com/api/v2/user/sso-profile',
@@ -69,6 +70,30 @@ describe('getSsoUserProfile', () => {
       optionCodes: [],
       canWatchVod: null,
       programApplications: [],
+      userId: null,
+    });
+  });
+
+  describe('userId(LC-3507)', () => {
+    function mockProfile(data: Record<string, unknown>) {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ status: 200, message: 'OK', data }),
+      });
+    }
+
+    it('양의 정수면 그대로 파싱한다', async () => {
+      mockProfile({ name: '홍길동', userId: 42 });
+      const result = await getSsoUserProfile('token');
+      expect(result?.userId).toBe(42);
+    });
+
+    it('없거나 잘못된 값이면 null(기록하지 않음)로 파싱한다', async () => {
+      for (const userId of [undefined, 0, -1, '42', 1.5]) {
+        mockProfile({ name: '홍길동', userId });
+        const result = await getSsoUserProfile('token');
+        expect(result?.userId).toBeNull();
+      }
     });
   });
 
