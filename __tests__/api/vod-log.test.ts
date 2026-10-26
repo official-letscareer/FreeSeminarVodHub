@@ -99,6 +99,7 @@ const SSO_PROFILE = {
   optionCodes: [],
   canWatchVod: false,
   programApplications: [],
+  userId: null,
 };
 
 const originalSecret = process.env.USAGE_LOG_HASH_SECRET;

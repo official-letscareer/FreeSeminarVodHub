@@ -35,6 +35,7 @@ function profile(canWatchVod: boolean | null, participating = false) {
     optionCodes: [],
     canWatchVod,
     programApplications: [],
+    userId: null,
   };
 }
 

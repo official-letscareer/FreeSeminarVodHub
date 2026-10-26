@@ -5,9 +5,14 @@ import { isEligibleForAccess } from './accessControl';
 import { findGroupAccessEndsAt } from './groupAccess';
 import type { ProgramApplication } from './types';
 
+/** SSO 로 통과하면 렛츠커리어 사용자 번호(`userId`)를 함께 준다. 재생 기록(LC-3507)에 쓴다. */
 export type VodAccessResult =
-  | { authorized: true }
+  | { authorized: true; userId?: number }
   | { authorized: false; reason: 'no-auth' | 'invalid-token' | 'ineligible' };
+
+function authorized(userId: number | null): VodAccessResult {
+  return userId === null ? { authorized: true } : { authorized: true, userId };
+}
 
 const INELIGIBLE: VodAccessResult = { authorized: false, reason: 'ineligible' };
 
@@ -20,12 +25,13 @@ const INELIGIBLE: VodAccessResult = { authorized: false, reason: 'ineligible' };
  */
 async function checkGroupAccess(
   applications: ProgramApplication[],
+  userId: number | null,
 ): Promise<VodAccessResult> {
   if (applications.length === 0) return INELIGIBLE;
   try {
     const rules = await getGroupAccessRules();
     return findGroupAccessEndsAt(applications, rules, new Date())
-      ? { authorized: true }
+      ? authorized(userId)
       : INELIGIBLE;
   } catch (err) {
     console.error('getGroupAccessRules error:', err);
@@ -65,8 +71,8 @@ export async function checkVodAccess(
   // 되돌아간다.
   if (settings.requireVodPass && profile.canWatchVod !== null) {
     return profile.canWatchVod
-      ? { authorized: true }
-      : checkGroupAccess(profile.programApplications);
+      ? authorized(profile.userId)
+      : checkGroupAccess(profile.programApplications, profile.userId);
   }
 
   const eligible = isEligibleForAccess(
@@ -75,8 +81,8 @@ export async function checkVodAccess(
     profile.optionCodes,
   );
   if (!eligible) {
-    return checkGroupAccess(profile.programApplications);
+    return checkGroupAccess(profile.programApplications, profile.userId);
   }
 
-  return { authorized: true };
+  return authorized(profile.userId);
 }

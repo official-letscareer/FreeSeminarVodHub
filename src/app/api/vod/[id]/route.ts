@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getVodList } from '@/lib/kv';
+import { recordVodPlay } from '@/lib/playRecords';
 import { SSO_ACCESS_TOKEN_COOKIE } from '@/lib/sso';
 import { checkVodAccess } from '@/lib/vodAccess';
 
@@ -42,6 +43,15 @@ export async function GET(
       { message: 'VOD를 찾을 수 없습니다.' },
       { status: 404 },
     );
+  }
+
+  // 이용권 환불 판정(LC-3507)이 이 기록을 본다. 기록에 실패해도 시청은 막지 않는다.
+  if (access.userId !== undefined) {
+    try {
+      await recordVodPlay(access.userId, vodId);
+    } catch (err) {
+      console.error('recordVodPlay error:', err);
+    }
   }
 
   return NextResponse.json(vod);
