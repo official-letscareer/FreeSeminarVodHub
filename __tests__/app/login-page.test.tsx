@@ -56,6 +56,12 @@ function setViewportWidth(width: number) {
   });
 }
 
+function openNamePhoneForm() {
+  fireEvent.click(
+    screen.getByRole('button', { name: '이름·전화번호로 로그인하기' }),
+  );
+}
+
 import LoginPage from '@/app/login/page';
 
 describe('LoginPage — SSO 버튼 (LC-3208)', () => {
@@ -80,12 +86,30 @@ describe('LoginPage — SSO 버튼 (LC-3208)', () => {
     process.env = ORIGINAL_ENV;
   });
 
-  it('기존 이름+전화번호 폼이 그대로 남아있다 (확정 사항 4 — 대체 아님)', () => {
+  it('처음에는 렛츠커리어 로그인만 보이고 이름+전화번호 폼은 접혀 있다 (LC-3515)', () => {
     render(<LoginPage />);
+
+    expect(
+      screen.getByRole('button', { name: '렛츠커리어로 로그인하기' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText('이름')).toBeNull();
+    expect(screen.queryByRole('button', { name: '확인' })).toBeNull();
+  });
+
+  it('"이름·전화번호로 로그인하기"를 누르면 폼이 열리고 렛츠커리어 로그인은 그대로 보인다 (확정 사항 4 — 대체 아님)', () => {
+    render(<LoginPage />);
+
+    openNamePhoneForm();
 
     expect(screen.getByLabelText('이름')).toBeInTheDocument();
     expect(screen.getByLabelText('전화번호')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '확인' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: '렛츠커리어로 로그인하기' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: '이름·전화번호로 로그인하기' }),
+    ).toBeNull();
   });
 
   it('"렛츠커리어로 로그인하기" 클릭 시 팝업 창으로 SSO 로그인 페이지를 연다', () => {
@@ -228,6 +252,7 @@ describe('LoginPage — SSO 버튼 (LC-3208)', () => {
   it('이름+전화번호 확인이 실패하면 고정 안내 문구를 보여준다', async () => {
     verifyChallengeMock.mockResolvedValue(false);
     render(<LoginPage />);
+    openNamePhoneForm();
 
     fireEvent.change(screen.getByLabelText('이름'), {
       target: { value: '홍길동' },
@@ -249,6 +274,7 @@ describe('LoginPage — SSO 버튼 (LC-3208)', () => {
   it('이름+전화번호 확인에 성공하면 /vod 로 이동한다', async () => {
     verifyChallengeMock.mockResolvedValue(true);
     render(<LoginPage />);
+    openNamePhoneForm();
 
     fireEvent.change(screen.getByLabelText('이름'), {
       target: { value: '홍길동' },
