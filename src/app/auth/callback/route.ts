@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractSsoTokens, setSsoTokenCookies } from '@/lib/sso';
+import {
+  clearNamePhoneLoginCookies,
+  clearSsoLoginCookies,
+} from '@/lib/loginCookies';
 
 /**
  * 전체 페이지 이동 방식의 SSO 콜백.
@@ -18,6 +22,10 @@ export async function GET(request: NextRequest) {
   }
 
   const response = NextResponse.redirect(new URL('/vod', request.url));
+  // 예전 로그인 쿠키를 먼저 지운다. auth_verified 가 남으면 접근 판정이 새 SSO 토큰보다 그것을
+  // 먼저 통과시켜 이전 계정으로 보이고, refreshToken 이 없는 응답이면 이전 계정의 것이 남는다.
+  clearNamePhoneLoginCookies(response);
+  clearSsoLoginCookies(response);
   setSsoTokenCookies(response, tokens);
   return response;
 }

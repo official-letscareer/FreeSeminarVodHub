@@ -36,6 +36,8 @@ export default function LoginPage() {
   const [phoneNum, setPhoneNum] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // 이름+전화번호 폼은 렛커 계정이 없는 예외 유저용 보조 경로라 눌러야 펼친다(LC-3515).
+  const [showNamePhoneForm, setShowNamePhoneForm] = useState(false);
   const popupRef = useRef<Window | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // 팝업을 열기 직전의 로그인 상태. 닫힘 감지에서 "이 팝업으로 새로 로그인된 것"과
@@ -228,53 +230,30 @@ export default function LoginPage() {
           </h1>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label
-              htmlFor="name"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              이름
-            </label>
-            <Input
-              id="name"
-              type="text"
-              placeholder="홍길동"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              disabled={loading}
-              required
-            />
-          </div>
+        {/*
+          렛츠커리어 로그인이 기본 경로다(LC-3515). 그래서 맨 위의 채운 주 버튼으로 둔다. 로고는
+          왼쪽 끝에 고정하고 문구는 가운데에 둔다 — 함께 가운데 정렬하면 문구 길이에 따라 로고
+          위치가 흔들린다. 로고 색이 버튼 배경(primary)과 같아 흰 원 위에 얹는다.
+        */}
+        <Button
+          type="button"
+          className="relative h-12 w-full text-sm font-medium"
+          onClick={handleSsoLogin}
+        >
+          <span className="absolute left-3 flex h-7 w-7 items-center justify-center rounded-full bg-white">
+            <img src="/logo/logo-simple.svg" alt="" className="h-4 w-4" />
+          </span>
+          렛츠커리어로 로그인하기
+        </Button>
 
-          <div>
-            <label
-              htmlFor="phoneNum"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              전화번호
-            </label>
-            <Input
-              id="phoneNum"
-              type="tel"
-              placeholder="010-1234-5678"
-              value={phoneNum}
-              onChange={handlePhoneChange}
-              disabled={loading}
-              required
-            />
-          </div>
-
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          <Button type="submit" className="h-12 w-full" disabled={loading}>
-            {loading ? '확인 중...' : '확인'}
-          </Button>
-        </form>
+        {/*
+          SSO 실패 안내도 여기 떠야 해서 폼 밖에 둔다. 폼은 접혀 있을 수 있다.
+        */}
+        {error && (
+          <Alert variant="destructive" className="mt-5">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
         <div className="my-7 flex items-center gap-3">
           <div className="h-px flex-1 bg-gray-200" />
@@ -283,27 +262,66 @@ export default function LoginPage() {
         </div>
 
         {/*
-          기존 이름+전화번호 폼은 그대로 둔다 — 렛커 계정이 없는 예외/프리미엄 유저는
-          이 폼으로만 들어올 수 있다(LC-3208 확정 사항 2·4). SSO는 선택지 추가일 뿐이다.
+          이름+전화번호 폼은 없애지 않는다 — 렛커 계정이 없는 예외/프리미엄 유저는 이 폼으로만
+          들어올 수 있다(LC-3208 확정 사항 2·4). 다만 보조 경로라 눌러야 펼친다(LC-3515).
         */}
-        {/*
-          구글·카카오 등 표준 OAuth 로그인 버튼과 같은 형태로 맞춘다 — 흰 배경에 옅은 테두리,
-          로고는 왼쪽 끝에 고정하고 문구는 버튼 가운데에 둔다. 로고와 문구를 함께 가운데
-          정렬하면 문구 길이에 따라 로고 위치가 흔들려 서비스마다 버튼이 달라 보인다.
-        */}
-        <Button
-          type="button"
-          variant="outline"
-          className="relative h-12 w-full border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
-          onClick={handleSsoLogin}
-        >
-          <img
-            src="/logo/logo-simple.svg"
-            alt=""
-            className="absolute left-4 h-5 w-5"
-          />
-          렛츠커리어로 로그인하기
-        </Button>
+        {showNamePhoneForm ? (
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label
+                htmlFor="name"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                이름
+              </label>
+              <Input
+                id="name"
+                type="text"
+                placeholder="홍길동"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                disabled={loading}
+                required
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="phoneNum"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                전화번호
+              </label>
+              <Input
+                id="phoneNum"
+                type="tel"
+                placeholder="010-1234-5678"
+                value={phoneNum}
+                onChange={handlePhoneChange}
+                disabled={loading}
+                required
+              />
+            </div>
+
+            <Button
+              type="submit"
+              variant="outline"
+              className="h-12 w-full"
+              disabled={loading}
+            >
+              {loading ? '확인 중...' : '확인'}
+            </Button>
+          </form>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            className="h-12 w-full border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+            onClick={() => setShowNamePhoneForm(true)}
+          >
+            이름·전화번호로 로그인하기
+          </Button>
+        )}
       </div>
     </div>
   );

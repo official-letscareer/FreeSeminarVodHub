@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 import '@testing-library/jest-dom';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 const pushMock = jest.fn();
 // 실제 useRouter 처럼 렌더마다 같은 객체를 돌려준다. 새 객체를 주면 router 를 의존성으로 둔
@@ -82,5 +82,20 @@ describe('VodListPage — 목록 조회와 접근 처리', () => {
       await screen.findByText('VOD 목록을 불러오지 못했습니다.'),
     ).toBeInTheDocument();
     expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('로그아웃은 서버에 로그인 쿠키 삭제를 요청한 뒤 /login 으로 보낸다 (LC-3515)', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue(jsonResponse(200, VODS)) as unknown as typeof fetch;
+    render(<VodListPage />);
+    await screen.findByText('마케팅 취업 준비 101');
+
+    fireEvent.click(screen.getByRole('button', { name: '로그아웃' }));
+
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/login'));
+    expect(global.fetch).toHaveBeenCalledWith('/api/auth/logout', {
+      method: 'POST',
+    });
   });
 });
