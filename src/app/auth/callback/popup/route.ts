@@ -4,6 +4,10 @@ import {
   extractSsoTokens,
   setSsoTokenCookies,
 } from '@/lib/sso';
+import {
+  clearNamePhoneLoginCookies,
+  clearSsoLoginCookies,
+} from '@/lib/loginCookies';
 
 /**
  * 팝업 창으로 로그인했을 때의 SSO 콜백.
@@ -60,6 +64,11 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  if (tokens) setSsoTokenCookies(response, tokens);
+  if (tokens) {
+    // 예전 로그인 쿠키 정리 — 전체 이동 콜백(`/auth/callback`)과 같은 이유다.
+    clearNamePhoneLoginCookies(response);
+    clearSsoLoginCookies(response);
+    setSsoTokenCookies(response, tokens);
+  }
   return response;
 }

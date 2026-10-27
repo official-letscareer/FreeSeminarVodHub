@@ -1,6 +1,8 @@
 import { GET } from '@/app/auth/callback/route';
+import { GET as popupGET } from '@/app/auth/callback/popup/route';
 import { NextRequest } from 'next/server';
 import { SSO_ACCESS_TOKEN_COOKIE, SSO_REFRESH_TOKEN_COOKIE } from '@/lib/sso';
+import { USAGE_LOG_ID_COOKIE } from '@/lib/usageLogIdentity';
 
 function makeRequest(query: string): NextRequest {
   return new NextRequest(`http://localhost/auth/callback${query}`);
@@ -31,7 +33,8 @@ describe('GET /auth/callback', () => {
     expect(res.cookies.get(SSO_ACCESS_TOKEN_COOKIE)?.value).toBe(
       'access.jwt.value',
     );
-    expect(res.cookies.get(SSO_REFRESH_TOKEN_COOKIE)).toBeUndefined();
+    // 예전 계정의 refreshToken 이 남지 않게 빈 값으로 지운다.
+    expect(res.cookies.get(SSO_REFRESH_TOKEN_COOKIE)?.value).toBe('');
   });
 
   it('token이 없으면 /login?error=sso_failed로 리다이렉트한다', async () => {
@@ -95,6 +98,38 @@ describe('GET /auth/callback', () => {
       expect(res.cookies.get(SSO_ACCESS_TOKEN_COOKIE)?.value).toBe(
         'email.access.jwt',
       );
+    });
+  });
+
+  // 이름+전화번호 로그인 쿠키(auth_verified)가 남아 있으면 접근 판정이 SSO 토큰보다 그것을 먼저
+  // 통과시켜, 다른 계정으로 로그인해도 예전 사람으로 보이고 이용 로그도 예전 이름으로 남았다.
+  describe.each([
+    ['/auth/callback', GET],
+    ['/auth/callback/popup', popupGET],
+  ])('%s — 예전 로그인 쿠키 정리 (LC-3515)', (_path, handler) => {
+    it('로그인에 성공하면 이름+전화번호 로그인 쿠키를 지운다', async () => {
+      const res = await handler(makeRequest('?token=access.jwt.value'));
+
+      for (const name of ['auth_verified', USAGE_LOG_ID_COOKIE]) {
+        expect(res.cookies.get(name)?.value).toBe('');
+        expect(res.cookies.get(name)?.expires).toEqual(new Date(0));
+      }
+    });
+
+    it('새 토큰에 refreshToken 이 없으면 예전 계정의 refreshToken 쿠키를 지운다', async () => {
+      const res = await handler(makeRequest('?token=access.jwt.value'));
+
+      expect(res.cookies.get(SSO_ACCESS_TOKEN_COOKIE)?.value).toBe(
+        'access.jwt.value',
+      );
+      expect(res.cookies.get(SSO_REFRESH_TOKEN_COOKIE)?.value).toBe('');
+    });
+
+    it('로그인에 실패하면 기존 쿠키를 건드리지 않는다', async () => {
+      const res = await handler(makeRequest(''));
+
+      expect(res.cookies.get('auth_verified')).toBeUndefined();
+      expect(res.cookies.get(SSO_REFRESH_TOKEN_COOKIE)).toBeUndefined();
     });
   });
 });

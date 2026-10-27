@@ -54,8 +54,10 @@ export default function VodListPage() {
     void loadVods();
   }, [loadVods]);
 
-  function handleLogout() {
-    document.cookie = 'auth_verified=; Max-Age=0; path=/';
+  async function handleLogout() {
+    // 로그인 쿠키는 httpOnly 라 여기서 document.cookie 로는 지워지지 않는다. 서버가 지운다.
+    // 요청이 실패해도 로그인 화면으로는 보낸다.
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     router.push('/login');
   }
 

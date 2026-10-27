@@ -4,6 +4,7 @@ import { POST } from '@/app/api/auth/verify/route';
 import { NextRequest } from 'next/server';
 import { isAllowedUser, checkRateLimit, getAccessSettings } from '@/lib/kv';
 import { AccessSettings } from '@/lib/types';
+import { SSO_ACCESS_TOKEN_COOKIE, SSO_REFRESH_TOKEN_COOKIE } from '@/lib/sso';
 
 const mockIsAllowedUser = isAllowedUser as jest.MockedFunction<
   typeof isAllowedUser
@@ -252,6 +253,19 @@ describe('POST /api/auth/verify', () => {
     );
     const cookie = res.headers.get('set-cookie');
     expect(cookie).toContain('auth_verified=1');
+  });
+
+  it('isChallenge: true 시 예전 SSO 로그인 쿠키를 지운다 (LC-3515)', async () => {
+    mockIsAllowedUser.mockResolvedValue(true);
+
+    const res = await POST(
+      makeRequest({ name: '홍길동', phoneNum: '01012345678' }),
+    );
+    for (const name of [SSO_ACCESS_TOKEN_COOKIE, SSO_REFRESH_TOKEN_COOKIE]) {
+      expect(res.cookies.get(name)?.value).toBe('');
+      expect(res.cookies.get(name)?.expires).toEqual(new Date(0));
+    }
+    expect(res.cookies.get('auth_verified')?.value).toBe('1');
   });
 
   it('isChallenge: false 시 쿠키 미설정', async () => {

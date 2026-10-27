@@ -3,6 +3,7 @@ import { isAllowedUser, checkRateLimit, getAccessSettings } from '@/lib/kv';
 import { isEligibleForAccess } from '@/lib/accessControl';
 import { RATE_LIMIT } from '@/lib/constants';
 import { setUsageLogIdentityCookie } from '@/lib/usageLogIdentity';
+import { clearSsoLoginCookies } from '@/lib/loginCookies';
 
 // 이용권 게이트(LC-3438)가 켜져 있을 때 이 경로로 들어온 `auth_verified` 쿠키의 수명.
 // 이 경로는 이용권 종료일을 받지 못해 쿠키가 만료·비활성을 반영하지 못하므로 짧게 둔다.
@@ -210,6 +211,8 @@ export async function POST(request: NextRequest) {
     const maxAge = vodPassGateOn
       ? VOD_PASS_GATE_COOKIE_MAX_AGE
       : DEFAULT_COOKIE_MAX_AGE;
+    // 예전 SSO 로그인 쿠키를 지운다. 이 계정으로 로그인했는데 이전 계정의 토큰이 남아 있지 않게 한다.
+    clearSsoLoginCookies(response);
     response.cookies.set('auth_verified', '1', {
       httpOnly: true,
       sameSite: 'lax',
